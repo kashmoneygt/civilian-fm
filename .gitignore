@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.local
+runs.db
+runs/*
+!runs/.gitkeep
+!runs/20260510T191849Z.md   # the v1 first-run evidence — keep tracked
+.streamlit/
+.DS_Store
+*.egg-info/

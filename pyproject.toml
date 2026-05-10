@@ -1,0 +1,21 @@
+[project]
+name = "civilian-fm"
+version = "0.1.0"
+description = "Palantir for civilians - agentic harness comparison dashboard"
+requires-python = ">=3.12"
+dependencies = [
+    "litellm>=1.50",
+    "anthropic>=0.40",
+    "openai>=1.50",
+    "streamlit>=1.40",
+    "youtube-transcript-api>=0.6.2",
+    "yt-dlp>=2025.1.0",
+    "beautifulsoup4>=4.12",
+    "requests>=2.32",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    "lxml>=5.0",
+]
+
+[dependency-groups]
+dev = []
