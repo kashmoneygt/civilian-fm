@@ -85,40 +85,131 @@ In v2, **`wiki/topics/` is removed.** The distilled "agent-owned" layer now live
 
 The knowledge-graph nodes. Two kinds:
 
-- **People** have `persona.md` + `skills.md` + `wiki/` + runnable `agent.py`. Conversational.
-- **Topics** have `overview.md` + `wiki/`. Not conversational — they exist to be referenced from people's personas.
+**Four entity kinds — people are flat; roles, jurisdictions, and topics are hierarchical:**
+
+- **People** are the **stable identity nodes**. Each lives at `entities/people/<slug>/` and *never moves*, even when their role changes (senator → governor → ex-president). Has `persona.md`, `skills.md`, `wiki/`, `agent.py`. Conversational.
+- **Roles** are time-bounded things people *hold*. `entities/roles/<role-slug>/` has an `overview.md` and `wiki/` describing the role itself (powers, scope, term length). A person's `persona.md` declares role-edges with start/end periods.
+- **Jurisdictions** describe *where* things operate. `entities/jurisdictions/<path>/` is a hierarchical tree (`us/`, `us/ga/`, `us/ga/cherokee-county/`, `us/wa/mountlake-terrace/`). Each has `overview.md` + `wiki/`. Federal, state, county, city all live in one tree.
+- **Topics** are concepts. `entities/topics/<domain>/<topic>/` has `overview.md` + `wiki/`. Not conversational — they exist to be referenced from people's personas.
 
 ```
 entities/
   _base.py                                    # PersonAgent class
-  _refs.py                                    # resolve [[topic:...]] / [[person:...]] cross-references
-  people/
-    ai-ml/                                    # public figures organized by domain of expertise
-      karpathy/
-        persona.md                            # nuwa-style: mental models, heuristics, expression DNA, honest boundaries
-        skills.md                             # what queries this person serves
-        wiki/
-          public/                             # crawled
-          user-notes/                         # community-contributed
-          interviews/                         # (future) AI-conducted phone-call transcripts
-        agent.py                              # subclasses PersonAgent
-    constitutional-law/
-      roberts/
-    local-government/                         # local people organized by jurisdiction
-      us/wa/mountlake-terrace/permit-office/lisa-smith/
-      us/ga/cherokee-county/alcohol-beverage-control/mary-johnson/
-  topics/
-    ai-ml/
-      transformers/
+  _refs.py                                    # resolve [[role:...]] / [[jur:...]] / [[topic:...]] / [[person:...]]
+
+  people/                                     # FLAT — never reorganized
+    karpathy/                                 # famous-name slug
+      persona.md
+      skills.md
+      wiki/{public, user-notes, interviews}/
+      agent.py
+    donald-trump/
+    brian-kemp/
+    tom-wheelwright/                          # tax consultant
+    lisa-smith-mountlake-terrace-permit/      # disambiguated slug for common names
+
+  roles/                                      # what people do / have done
+    us-president/
+      overview.md                             # powers, term, scope
+      wiki/
+    us-governor-georgia/
+    us-supreme-court-justice/                 # held by 9 people simultaneously
+    us-senate-candidate-georgia-2026/         # candidates live here pre-election
+    mountlake-terrace-permit-specialist/
+    cherokee-county-abc-board-chair/
+    ai-researcher/                            # informal/professional roles work too
+    s-corp-tax-strategist/
+
+  jurisdictions/                              # geographic / governmental
+    us/
+      overview.md                             # federal
+      ga/
         overview.md
-        wiki/
-    constitutional-law/
-      14th-amendment-citizenship/
+        cherokee-county/
+        cobb-county/
+      wa/
+        mountlake-terrace/
+
+  topics/                                     # concepts
+    ai-ml/transformers/
+    constitutional-law/14th-amendment-citizenship/
+    taxes/section-179/
+    taxes/s-corp-strategy/
 ```
 
-**Hierarchy choice rationale:** public figures organize by primary domain because "what they're known for" is how you find them. Local-government people organize by jurisdiction because that's how civilians need to find them ("the permit office in MY city").
+### Persona frontmatter declares the edges
 
-**Knowledge graph via cross-references.** Persona files include `[[topic:ai-ml/transformers]]` and `[[person:ai-ml/ilya]]` syntax. When a `PersonAgent` loads, the runtime resolves these references and pulls the linked topic wikis into context. No graph database — `grep` finds connections. When two people both reference the same topic, that's an emergent edge.
+```yaml
+---
+name: Donald Trump
+slug: donald-trump
+aliases: ["Donald J. Trump", "President Trump"]
+roles:
+  - role: us-president
+    period: [2017-01-20, 2021-01-20]
+  - role: us-president
+    period: [2025-01-20, null]                # current; null = ongoing
+  - role: businessman
+    period: [1971, null]
+jurisdictions:
+  primary: us
+domains: [politics, business, media]
+linked_topics:
+  - constitutional-law/14th-amendment-citizenship
+  - constitutional-law/executive-power
+---
+```
+
+```yaml
+---
+name: Brian Kemp
+slug: brian-kemp
+roles:
+  - role: us-governor-georgia
+    period: [2019-01-14, null]
+  - role: us-georgia-secretary-of-state
+    period: [2010-01, 2018-11]
+jurisdictions:
+  primary: us/ga
+domains: [politics]
+---
+```
+
+```yaml
+---
+name: Lisa Smith
+slug: lisa-smith-mountlake-terrace-permit
+roles:
+  - role: mountlake-terrace-permit-specialist
+    period: [2019, null]
+jurisdictions:
+  primary: us/wa/mountlake-terrace
+domains: [local-government, permits]
+---
+```
+
+### What this design buys us
+
+| Case | Resolution |
+|---|---|
+| Trump's two presidencies | Two `us-president` role-edges with different periods on one person. |
+| Senator → governor | Add new role-edge, end old role-edge. Person's directory never moves. |
+| Political candidate who wins | `candidate-for-X` role ends, `office-X` role begins. Same person. |
+| Multi-role figure (Karpathy: researcher + entrepreneur + educator) | Multiple role-edges in frontmatter; primary domain not forced. |
+| Common-name disambiguation (Lisa Smith) | Slug includes disambiguator (`lisa-smith-mountlake-terrace-permit`). Aliases for search. |
+| Federal/state/local in one model | Jurisdictions tree is one hierarchy; roles reference the jurisdiction slug. |
+| Role groups (9 SCOTUS justices) | One role entity, 9 people-edges to it. |
+| Discovery ("good S-corp tax strategist") | Researcher queries: people with `domains: [taxes]` + role `s-corp-tax-strategist` + ≥N public sources. |
+
+### Cross-references and the knowledge graph
+
+Cross-references in markdown bodies use prefixed syntax: `[[role:us-governor-georgia]]`, `[[jur:us/ga/cherokee-county]]`, `[[topic:taxes/section-179]]`, `[[person:karpathy]]`. The runtime resolves them when an agent loads, pulling linked wikis into context.
+
+`grep` finds connections — no graph database. Two people referencing the same topic creates an emergent edge ("Karpathy and Ilya both deeply discuss transformers" surfaces from a simple grep).
+
+### Frontmatter as the canonical edges; markdown body as content
+
+Frontmatter declares **structural** edges (roles, jurisdictions, domains, linked-topics). Markdown body uses `[[...]]` for **contextual** references inline. The two are different — frontmatter is queryable, body cross-refs are loaded into context. A future `_index.md` generator can derive an index from frontmatter for fast discovery without touching content.
 
 ### 2.4 PersonAgent — Python container
 
@@ -217,17 +308,28 @@ civilian-fm/
       youtube/<vid>.md
       web/<slug>.md
 
-  entities/                                       # NEW — knowledge graph nodes
+  entities/                                       # NEW — knowledge graph nodes (4 kinds)
     _base.py                                      # PersonAgent class
-    _refs.py                                      # resolve cross-references
-    people/
-      <domain>/<person>/                          # public figures by expertise
-        persona.md  skills.md  wiki/  agent.py
-      local-government/<country>/<state>/<jurisdiction>/<office>/<person>/
-        persona.md  skills.md  wiki/  agent.py
-    topics/
+    _refs.py                                      # resolve [[role:...]] / [[jur:...]] / [[topic:...]] / [[person:...]]
+    people/                                       # FLAT, never reorganized
+      <slug>/                                     # globally-unique slug; disambiguated if needed
+        persona.md                                # frontmatter declares roles/jurisdictions/domains
+        skills.md
+        wiki/
+        agent.py
+    roles/                                        # what people do / have done
+      <role-slug>/
+        overview.md
+        wiki/
+    jurisdictions/                                # hierarchical (federal -> state -> county -> city)
+      us/overview.md
+      us/ga/overview.md
+      us/ga/cherokee-county/overview.md
+      us/wa/mountlake-terrace/overview.md
+    topics/                                       # concepts
       <domain>/<topic>/
-        overview.md  wiki/
+        overview.md
+        wiki/
 
   researcher/                                     # NEW — pipeline that builds entities
     pipeline.py                                   # ~30 LOC framework
@@ -263,28 +365,28 @@ Each step has a concrete verification. Don't move on without it.
 1. **Delete v1 tax-advisor artifacts.** No backwards compatibility.
    - *Verify:* `agents/tax-advisor/` and `wiki/topics/taxes/` gone. `dashboard/runners.py` doesn't import tax-advisor.
 
-2. **`entities/_base.py` — PersonAgent class** (~60 LOC).
-   - *Verify:* Can instantiate `PersonAgent(Path("entities/people/test/test/"))` with stub files and call `.chat("hi")`.
+2. **`entities/_base.py` — PersonAgent class** (~60 LOC) + **`entities/_refs.py` — cross-reference resolver** (~40 LOC).
+   - *Verify:* Can instantiate `PersonAgent(Path("entities/people/test/"))` with stub files and call `.chat("hi")`. The resolver loads any `[[role:...]] / [[jur:...]] / [[topic:...]]` references into context.
 
 3. **`researcher/pipeline.py` — processor framework** (~30 LOC).
    - *Verify:* `run([lambda r: r], Request("test"))` returns the request unchanged.
 
 4. **First processors — `clarify`, `identify`, `research`, `distill`.** ~50 LOC each.
    - *Verify clarify:* ambiguous goal → 1-3 questions; clear goal → no questions.
-   - *Verify identify:* "permits in Mountlake Terrace WA" → returns a target person reference.
-   - *Verify research:* spawns parallel crawls, writes both `wiki/raw/` and `entities/people/<...>/wiki/public/` files. Gracefully degrades for thin-source targets (nuwa adaptation, Appendix A).
-   - *Verify distill:* produces a `persona.md` following the nuwa schema (mental models, heuristics, expression DNA where present, honest boundaries).
+   - *Verify identify:* "permits in Mountlake Terrace WA" → returns a target person reference *and* creates `entities/roles/mountlake-terrace-permit-specialist/` + `entities/jurisdictions/us/wa/mountlake-terrace/` if missing.
+   - *Verify research:* spawns parallel crawls, writes both `wiki/raw/` and `entities/people/<slug>/wiki/public/` files. Gracefully degrades for thin-source targets (nuwa adaptation, Appendix A).
+   - *Verify distill:* produces a `persona.md` following the nuwa 12-section schema with frontmatter declaring `roles`, `jurisdictions`, `domains`, `linked_topics`.
 
 5. **First vertical — Lisa Smith (Mountlake Terrace permit office) end-to-end.**
-   - *Verify:* `python -m scripts.research "i want to create a permit for a deck in Mountlake Terrace WA"` populates `entities/people/local-government/us/wa/mountlake-terrace/permit-office/lisa-smith/` and prints an initial answer.
-   - *Verify:* `python entities/people/local-government/us/wa/mountlake-terrace/permit-office/lisa-smith/agent.py` opens a chat with Lisa.
+   - *Verify:* `python -m scripts.research "i want to create a permit for a deck in Mountlake Terrace WA"` populates `entities/people/lisa-smith-mountlake-terrace-permit/` with a persona linking to `[[role:mountlake-terrace-permit-specialist]]` and `[[jur:us/wa/mountlake-terrace]]`.
+   - *Verify:* `python entities/people/lisa-smith-mountlake-terrace-permit/agent.py` opens a chat with Lisa.
 
 6. **Second vertical — Karpathy (control case for source-abundant target).**
-   - *Verify:* Same pipeline, no code changes, produces a denser persona.md with multiple `[[topic:...]]` cross-references that resolve cleanly.
+   - *Verify:* Same pipeline, no code changes, populates `entities/people/karpathy/` with multiple role-edges (`ai-researcher`, `tesla-director-of-ai`, `openai-cofounder`) and `[[topic:...]]` cross-references that resolve cleanly.
 
 7. **URL pipeline + entity extraction.**
-   - *Verify:* `python -m scripts.research --url "https://www.youtube.com/watch?v=GCygktDbU3Q"` (SCOTUS transcript already in `wiki/raw/`) creates person-agents for Roberts, Sotomayor, Trump, Barbara, Sour, plus topic pages for `birthright-citizenship` and `14th-amendment-citizenship-clause`.
-   - *Verify:* Trump's persona links to `[[topic:constitutional-law/birthright-citizenship]]`; loading Trump-agent pulls that wiki in.
+   - *Verify:* `python -m scripts.research --url "https://www.youtube.com/watch?v=GCygktDbU3Q"` creates person-entities for Roberts, Sotomayor, Trump, Barbara, Sour; role-entities like `us-supreme-court-justice`, `us-solicitor-general`; topic-entities for `14th-amendment-citizenship` and `birthright-citizenship`.
+   - *Verify:* Trump's persona links to `[[topic:constitutional-law/14th-amendment-citizenship]]` and `[[role:us-president]]`; loading Trump-agent pulls both wikis in.
 
 8. **Dashboard — 4 variants targeting person-agents.**
    - *Verify:* Streamlit page lets you pick an entity, runs bare/persona/stuffed/agentic against a query, shows visible delta. Logs to `runs.db`.
@@ -305,7 +407,9 @@ The product is **"navigate friction in modern life by chatting with the right pe
 | SCOTUS oral argument explorer | Roberts, Sotomayor, Trump, Barbara | the SCOTUS YouTube transcript we already have | v2 URL-mode test |
 | Cherokee County liquor license | Mary Johnson, ABC board chair | county site, meeting minutes, eventually user-call notes | v2.5 |
 | Fulton County property tax appeal | County tax assessor staff | assessor site, recent appeal cases | v3 |
-| Hiring first employee (S-corp) | A real CPA distilled from their public content | CPA blog, podcast appearances, video Q&As | v3 — replaces v1's tax-advisor |
+| S-corp tax strategy | Tom Wheelwright, Karlton Dennis, Mark J. Kohler (all real, high-public-corpus) | books, podcasts, YouTube channels | v3 — replaces v1's generic tax-advisor with real-person agents |
+| Governor of GA (state-level discovery) | Brian Kemp | state site, news, press conferences | v3 — exercises the federal/state/local jurisdictions tree |
+| 2028 presidential candidate exploration | Various candidates as they announce | campaign sites, announcement speeches, news | v3 — exercises candidate-role pattern (role with null end-date) |
 
 ---
 
@@ -326,11 +430,13 @@ The product is **"navigate friction in modern life by chatting with the right pe
 When prompting Claude Code on this repo:
 
 - **People-shaped agents only.** No domain-shaped agents (`agents/tax-advisor/`-style). Every conversational agent represents a real or composite person with a `persona.md`, `skills.md`, and growing `wiki/`.
+- **People are flat — they never move.** When a person's role changes, update their frontmatter (end old role-edge, add new role-edge). Do not move directories. Do not rename slugs without a rewrite of all `[[person:...]]` references.
+- **Roles, jurisdictions, and topics are separate entities.** Each has its own `overview.md` + `wiki/`. People reference them via frontmatter and `[[...]]` body syntax. Don't put role-specific or jurisdiction-specific knowledge inside a person's wiki — it belongs in the role/jurisdiction entity.
 - **Stay in vertical-slice mode.** Don't build all entity kinds before the first person-agent runs end-to-end.
 - **Don't introduce abstractions** until there are at least three concrete instances of the thing being abstracted. The processor pipeline pattern (Appendix C) applies only to multi-step agents like the researcher — never to single-call agents.
 - **Cite from the entity's wiki, not from training data.** If an agent answers without citing, the harness is broken.
 - **Honest boundaries are mandatory.** Every `persona.md` has a section listing what we don't know about this person. This is non-negotiable per Appendix A.
-- **Cross-references are the graph.** Use `[[topic:...]]` and `[[person:...]]` in markdown. Don't introduce a graph database.
+- **Cross-references are the graph.** Use `[[role:...]]`, `[[jur:...]]`, `[[topic:...]]`, `[[person:...]]` in markdown. Frontmatter declares structural edges; body uses `[[...]]` for contextual references. Don't introduce a graph database.
 - **No Docker, no vector DB, no custom frontend** without explicit user approval. Push back on these suggestions.
 
 ---
@@ -375,6 +481,18 @@ Nuwa explicitly handles thin-source targets. From their docs (translated):
 
 - **The framework wrapper.** Nuwa is Claude Code-native (`npx skills add`). We re-implement the patterns in Python so it integrates with LiteLLM and our processor pipeline.
 - **WebSearch as primary source.** Our crawler is more deliberate and writes structured `wiki/raw/` files.
+
+### Where we go beyond nuwa
+
+Nuwa is a **person-only** distillation system — input a name, get a `SKILL.md`. There's no separate `roles/` or `jurisdictions/` directory; no notion of "a person holds a role over a time period." Our 3-entity model (people + roles + jurisdictions, plus topics) extends nuwa to support:
+
+- One person with multiple time-bounded roles (Trump's two presidencies, Karpathy's Tesla/OpenAI tenures).
+- Role transitions without moving directories (senator → governor → ex-governor).
+- Federal/state/local government in one jurisdiction tree.
+- Candidates as first-class entities (a role with `period: [start, null]`).
+- Role groups (one `us-supreme-court-justice` role held by 9 people).
+
+This is our extension. Nuwa handles the per-person distillation; we wrap it in a graph.
 
 ### Citation: where to verify
 
