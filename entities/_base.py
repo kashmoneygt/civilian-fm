@@ -17,6 +17,12 @@ load_dotenv()
 
 DEFAULT_MODEL = os.getenv("AGENT_MODEL", "gpt-4o-mini")
 
+# Token budgets enforced at runtime (per PLAN.md Section 2.7 Rule 2: density over volume).
+# Soft caps per entity kind, in chars (~4 chars/token).
+OWN_WIKI_BUDGET_CHARS = 60_000  # person's own wiki/ — primary context
+PER_LINKED_BUDGET_CHARS = 15_000  # each linked entity (role, jurisdiction, topic)
+PER_FILE_BUDGET_CHARS = 8_000     # cap any single file
+
 
 class PersonAgent:
     def __init__(self, person_dir: Path, model: str = DEFAULT_MODEL):
@@ -35,10 +41,10 @@ class PersonAgent:
         # own wiki
         self.own_wiki = self._load_own_wiki()
 
-        # resolved cross-references
+        # resolved cross-references (each capped)
         self.linked: dict[str, str] = {}
         for ref in list({*refs_in_frontmatter(fm), *refs_in_body(body)}):
-            content = load_entity_content(ref)
+            content = load_entity_content(ref, max_chars=PER_LINKED_BUDGET_CHARS)
             if content is not None:
                 self.linked[f"{ref.kind}:{ref.slug}"] = content
 
@@ -48,9 +54,17 @@ class PersonAgent:
         wiki_dir = self.dir / "wiki"
         if not wiki_dir.exists():
             return ""
-        chunks = []
+        chunks: list[str] = []
+        total = 0
         for f in sorted(wiki_dir.rglob("*.md")):
-            chunks.append(f"### {f.relative_to(self.dir)}\n\n{f.read_text(encoding='utf-8')}")
+            text = f.read_text(encoding="utf-8")
+            if len(text) > PER_FILE_BUDGET_CHARS:
+                text = text[:PER_FILE_BUDGET_CHARS] + f"\n[... truncated at {PER_FILE_BUDGET_CHARS} chars]"
+            chunks.append(f"### {f.relative_to(self.dir)}\n\n{text}")
+            total += len(text)
+            if total >= OWN_WIKI_BUDGET_CHARS:
+                chunks.append(f"\n[... {len(list(wiki_dir.rglob('*.md'))) - len(chunks)} more files omitted, total exceeded {OWN_WIKI_BUDGET_CHARS} chars]")
+                break
         return "\n\n---\n\n".join(chunks)
 
     @property

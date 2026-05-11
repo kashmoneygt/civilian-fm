@@ -24,7 +24,8 @@ RAW_DIR = REPO / "wiki" / "raw" / "web"
 
 # Token-ish budgets (rough char limits, 1 token ≈ 4 chars)
 PERSONA_BUDGET_CHARS = {True: 20_000, False: 60_000}  # keyed by thin_source bool
-SOURCE_BUDGET_CHARS = 250_000  # how much raw context we feed to the LLM at most
+SOURCE_BUDGET_CHARS = 80_000  # ~20k tokens; leaves headroom under gpt-4o-mini 128k
+PER_SOURCE_BUDGET_CHARS = 8_000  # cap each individual page so a single huge page doesn't crowd out others
 
 
 def _strip_fences(s: str) -> str:
@@ -175,7 +176,10 @@ Output ONLY markdown, no commentary."""
 
 
 def _read_raw_sources(crawled: list[dict]) -> tuple[str, list[str]]:
-    """Read raw markdown files referenced by crawl results. Returns (concatenated_block, basenames)."""
+    """Read raw markdown files referenced by crawl results. Returns (concatenated_block, basenames).
+
+    Each source is truncated to PER_SOURCE_BUDGET_CHARS; total stops at SOURCE_BUDGET_CHARS.
+    """
     chunks: list[str] = []
     basenames: list[str] = []
     total = 0
@@ -186,6 +190,8 @@ def _read_raw_sources(crawled: list[dict]) -> tuple[str, list[str]]:
         if not path.exists():
             continue
         text = path.read_text(encoding="utf-8")
+        if len(text) > PER_SOURCE_BUDGET_CHARS:
+            text = text[:PER_SOURCE_BUDGET_CHARS] + f"\n\n[... truncated at {PER_SOURCE_BUDGET_CHARS} chars]"
         basename = path.name
         chunks.append(f"### {basename}\n\n{text}")
         basenames.append(basename)

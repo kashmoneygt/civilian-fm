@@ -182,6 +182,38 @@ Asked all 4 justice agents the exact question at the heart of the case:
 
 **This is the strongest AHA so far.** Same constitutional question, four meaningfully different answers — each consistent with the justice's actual jurisprudence — vs one mushy "balanced" answer from the bare model. For a lawyer prepping arguments or a citizen trying to understand the case, the persona-agent answers are infinitely more useful than the bare summary. They reveal **why** the justices disagree, not just **that** they do.
 
+## Iteration 4 — Two tax strategists, same S-corp tax question
+
+PLAN.md backlog: "Hiring first employee (S-corp) — A real CPA distilled from their public content — replaces v1's generic tax-advisor with real-person agents." Built two real-named strategists and compared on the original S-corp tax question.
+
+Built person-agents:
+- **Tom Wheelwright** — CPA, Rich Dad advisor, author of *Tax-Free Wealth*, founder of WealthAbility. Persona captured his real frames: taxes-as-incentives, partnership-with-government, wealth-through-real-estate, shift-from-employee-to-investor.
+- **Karlton Dennis** — tax YouTuber with substantial public following. Persona captured "Tax-Free Living" framing, family-tax-shifting, aggressive small-biz tactics.
+
+### AHA #3 — Same question, three different toolkits, only one knows the Augusta Rule
+
+Query: *"I own a small business as an S-corp making $400k/year, tired of paying so much in taxes. My CPA only talks about 401(k) contributions. What 2-3 non-obvious strategies should I actually use to cut my tax burden? Be specific."*
+
+Full output: [runs/v2-tax-strategists-comparison-20260511T210000Z.md](runs/v2-tax-strategists-comparison-20260511T210000Z.md).
+
+| Agent | Signature strategies surfaced |
+|---|---|
+| **bare** | QBI 20% deduction, S-corp health insurance, accountable plan, Section 179, defined benefit plan. Generic CPA checklist. |
+| **Wheelwright** | Home office, business meals, accountable plan, SEP IRA $66k, **Cash Balance Plan $100k+/year**. The wealth-building retirement stack. |
+| **Karlton Dennis** | Family income shifting, **Augusta Rule (rent home to S-corp 14 days/year tax-free)**, prepaying deductions. Aggressive YouTuber-tactical. |
+
+**The Augusta Rule** is the standout. At fair-market $1000/day × 14 days = $14k tax-free annually. Bare didn't surface it. Wheelwright didn't surface it. Only Karlton Dennis did, because his actual public content emphasizes exactly these tactical small-biz strategies.
+
+**This is the "Palantir for civilians" thesis in action.** The user doesn't need to know Karlton Dennis exists. Ask for non-obvious tax strategies, and the system can route to (or surface across) experts whose toolkits contain non-obvious strategies. Compare across voices.
+
+For a $400k S-corp owner, the combined advice across these three could save $30k+/year in real tax dollars:
+- Cash Balance Plan (Wheelwright): ~$30k deferred-tax annually at 30% bracket
+- Augusta Rule (Dennis): ~$5k tax savings on $14k tax-free rent
+- Family employment (Dennis): variable, can shift $20k+ income to lower brackets
+- Everything bare mentioned still applies on top
+
+The bare answer alone leaves real money on the table because it doesn't know which expert to channel.
+
 ## Synthesis — where does the system steer away from the mean?
 
 After three experiments (Lisa Smith/Jeff Niten Mountlake Terrace, Karpathy, 4 SCOTUS justices), the pattern is clear:

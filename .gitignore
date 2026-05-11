@@ -10,6 +10,7 @@ runs/*
 !runs/v2-mountlake-terrace-permit-office-20260511T170616Z.md   # v2 first-vertical evidence
 !runs/v2-jeff-niten-mountlake-terrace-20260511T173510Z.md      # v2 iteration-1 evidence (discover_people)
 !runs/v2-andrej-karpathy-20260511T200759Z.md                   # v2 iteration-2 evidence (Karpathy AHA)
+!runs/v2-tax-strategists-comparison-20260511T210000Z.md        # v2 iteration-4 evidence (Augusta Rule AHA)
 .streamlit/
 .DS_Store
 *.egg-info/

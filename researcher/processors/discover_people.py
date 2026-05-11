@@ -23,7 +23,8 @@ from ..pipeline import Request
 REPO = ENTITIES_DIR.parent
 RAW_DIR = REPO / "wiki" / "raw" / "web"
 
-SOURCE_BUDGET_CHARS = 200_000
+SOURCE_BUDGET_CHARS = 80_000
+PER_SOURCE_BUDGET_CHARS = 8_000
 
 PROMPT = """Given the user's goal, the identified jurisdiction/role, and the raw pages crawled, identify NAMED INDIVIDUALS who would be the best person for the user to chat with.
 
@@ -83,6 +84,8 @@ def _build_pages_block(crawled: list[dict]) -> str:
         if not path.exists():
             continue
         text = path.read_text(encoding="utf-8")
+        if len(text) > PER_SOURCE_BUDGET_CHARS:
+            text = text[:PER_SOURCE_BUDGET_CHARS] + f"\n[... truncated]"
         chunks.append(f"### {path.name}\n\n{text}")
         total += len(text)
         if total > SOURCE_BUDGET_CHARS:
