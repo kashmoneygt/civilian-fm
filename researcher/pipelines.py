@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 from .pipeline import run, Request
-from .processors import answer, clarify, crawl_url, distill, extract_entities, identify, research
+from .processors import answer, clarify, crawl_url, discover_people, distill, extract_entities, identify, research
 
 GOAL_PIPELINE = [
     clarify.run,
     identify.run,
     research.run,
+    discover_people.run,  # NEW — scan crawls for named individuals; prefer over composite
     distill.run,
     answer.run,
 ]

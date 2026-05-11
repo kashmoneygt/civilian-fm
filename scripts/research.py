@@ -99,8 +99,14 @@ def main() -> int:
         return 2
 
     print("\n=== Result\n")
+    candidates = req.state.get("candidates", [])
+    if candidates:
+        print("Person candidates discovered:")
+        for c in candidates[:5]:
+            print(f"  - [{c.get('relevance_score', 0):>2}] {c['name']} — {c.get('role_hint', '')} ({c.get('source_file', '')})")
+        print(f"  PICKED: {candidates[0]['name']}")
     if "person_dir" in req.state:
-        print(f"Built person-agent at: {req.state['person_dir']}")
+        print(f"\nBuilt person-agent at: {req.state['person_dir']}")
     if "initial_answer" in req.state:
         print("\n--- initial answer ---\n")
         print(req.state["initial_answer"])

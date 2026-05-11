@@ -1,6 +1,6 @@
 ---
 source: web
-fetched_at: '2026-05-11T17:01:19Z'
+fetched_at: '2026-05-11T17:30:46Z'
 url: https://www.citydirectory.us/city-mountlake-terrace.html
 title: Mountlake Terrace WA - City hall, mayor, stats, schools, attractions, and more
 domain: citydirectory.us

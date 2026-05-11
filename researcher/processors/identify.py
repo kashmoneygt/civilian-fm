@@ -26,20 +26,26 @@ Identify the target entity that should answer this. Return JSON:
 
 {{
   "target_kind": "person",
-  "person_name_hint": "<best guess at the specific person, or null if a generic office>",
-  "person_slug": "<slugified name + disambiguator (city/role) if a common name>",
+  "person_name_hint": "<MUST be a real human's first+last name (e.g. 'Andrej Karpathy', 'Brian Kemp') OR null. NEVER a role title like 'permit specialist' or 'building official'. If you don't know a specific named individual, return null and the system will discover one from crawled pages.>",
+  "person_slug": "<slugified first-last name + disambiguator if common name, OR null when person_name_hint is null>",
   "role_slug": "<short kebab-case role identifier, e.g. 'mountlake-terrace-permit-specialist' or 'ai-researcher'>",
   "role_overview": "<one sentence: what this role does>",
   "jurisdiction_path": "<slash path like 'us/wa/mountlake-terrace' or 'us' for federal, or null if no jurisdiction applies>",
   "jurisdiction_overview": "<one sentence: what this jurisdiction is>",
   "domains": ["<short tags, e.g. 'local-government', 'permits'>"],
   "search_queries": [
-    "<3-6 web search queries that would find authoritative source material about this person/role/jurisdiction. Order by specificity: most specific first.>"
+    "<6-8 queries. STRUCTURE:",
+    "  - 2-3 queries about the procedural specifics of the goal (e.g. 'mountlake terrace deck permit requirements')",
+    "  - 3-5 queries that would surface NAMED INDIVIDUALS in this jurisdiction —",
+    "    elected officials, council members, mayor, named department staff, planning commissioners.",
+    "    Examples: '<city> city council members', '<city> mayor', '<city> staff directory',",
+    "    '<city> planning commission members', '<city> building department director'.",
+    "  Most-specific first."
   ]
 }}
 
 Rules:
-- If the subject is a jurisdiction (e.g. "Mountlake Terrace WA"), the role + jurisdiction define the entity. The specific person may be unknown — set person_name_hint to null and use a slug like "mountlake-terrace-permit-office".
+- If the subject is a jurisdiction (e.g. "Mountlake Terrace WA"), we PREFER to surface a specific named person eventually. Set person_name_hint to null only when no obvious named individual exists (we'll discover candidates from the crawled pages).
 - If the subject is a public figure, use their canonical slug (karpathy, donald-trump, brian-kemp).
 - Slugs are lowercase, kebab-case, ASCII only.
 - search_queries should be web-search-ready text (no operators required)."""

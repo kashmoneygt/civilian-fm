@@ -1,6 +1,6 @@
 ---
 source: web
-fetched_at: '2026-05-11T17:03:46Z'
+fetched_at: '2026-05-11T17:28:29Z'
 url: https://permitplace.com/city/mountlake-terrace-wa-building-permits/
 title: Mountlake Terrace, WA Building Permits | Review Times and Process - Permit
   Place

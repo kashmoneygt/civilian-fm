@@ -91,9 +91,45 @@ Cost: stuffed/agentic are ~25x more expensive than bare/persona (~$0.005 per que
 4. **Auto-creation of role + jurisdiction stubs** — distill creates them on demand if missing. No "entity not found" errors.
 5. **DuckDuckGo search is free and adequate** for first vertical. Some result quality issues (TikTok, unrelated city pages) but the LLM ignored bad sources.
 
+## Iteration 1 — discover_people (added 2026-05-11)
+
+User feedback: "I was hoping our query would discover https://cityofmlt.com/587/City-Council and create an agent from a real council member."
+
+Diagnosis: `identify` generated only procedural search queries, so `research` never visited the council page. There was no step that pivoted from "we have jurisdiction info" to "find a named person."
+
+Fix:
+1. Tightened `identify` prompt to require `person_name_hint` be a real first+last name OR null (not a role title), and to generate **people-discovery queries** alongside procedural ones.
+2. Added `discover_people` processor between `research` and `distill`. It scans the crawled raw pages for named individuals, returns ranked candidates with `relevance_score`, picks the top one, and updates the target's `person_name_hint`, `person_slug`, and `role_slug` (so the persona reflects the picked person's actual role, not the goal-derived role).
+
+Result on the same query:
+
+```
+Person candidates discovered:
+  - [10] Jeff Niten     — City Manager of Mountlake Terrace
+  - [ 9] Steve Woodard  — Mayor
+  - [ 8] Kyoko Matsumoto Wright — Council Member
+  - [ 8] Bryan Wahl     — Mayor Pro Tem
+  - [ 7] Sam Doyle      — Council Member
+  - [ 6] Erin Murray    — Council Member
+  PICKED: Jeff Niten
+
+Built person-agent at: entities/people/jeff-niten-mountlake-terrace
+```
+
+Jeff Niten's persona now carries:
+- Real name and verified role (City Manager since April 2023)
+- Concrete facts from crawled news: "$4.2M projected budget gap per year through 2030"
+- "1,800 housing units under construction or planned near the light rail station"
+- Council-Manager government structure (not boilerplate — specifically MLT's)
+- Cited sources: heraldnet.com, theurbanist.org, cityofmlt.com
+
+Full comparison: [runs/v2-jeff-niten-mountlake-terrace-20260511T173510Z.md](runs/v2-jeff-niten-mountlake-terrace-20260511T173510Z.md).
+
+Interesting nuance observed in the 4-variant: on a more complex query ("...does the budget gap affect permit speed?"), **stuffed actually matched or slightly beat agentic** on factual coverage — it surfaced the $6.50 State Building Code Council fee that agentic dropped. This is exactly the Section 2.7 canary: the persona's selective resolution may be filtering out useful signal. Future iteration: tighten `skills.md` link-following rules to ensure budget-related queries actually pull the budget-gap facts the persona has.
+
 ## Known issues / next iteration targets
 
-1. **No specific person identified.** The system produced "Mountlake Terrace Permit Specialist (composite)" — a role-shaped agent, not a person. Real Lisa Smith (or whoever the actual permit specialist is) wasn't surfaced. Next iteration: identify processor should crawl staff directories and surface named individuals.
+1. ~~No specific person identified.~~ **Fixed in iteration 1.**
 2. **Hallucinated cross-references in skills.md.** The LLM invented `[[jur:Mountlake Terrace Zoning Code]]` (not a jurisdiction; that's a topic). Need to constrain skills.md generation to known entity slugs.
 3. **Search result noise.** ~25% of crawls returned irrelevant pages (TikTok, generic city directory). A relevance filter (LLM-as-judge or simple heuristics) before crawling would tighten the corpus.
 4. **No Karpathy vertical yet.** Build step 6 in PLAN.md — run same pipeline on a source-abundant target to verify it scales up gracefully.

@@ -8,6 +8,7 @@ runs/*
 !runs/.gitkeep
 !runs/20260510T191849Z.md   # v1 first-run evidence
 !runs/v2-mountlake-terrace-permit-office-20260511T170616Z.md   # v2 first-vertical evidence
+!runs/v2-jeff-niten-mountlake-terrace-20260511T173510Z.md      # v2 iteration-1 evidence (discover_people)
 .streamlit/
 .DS_Store
 *.egg-info/
