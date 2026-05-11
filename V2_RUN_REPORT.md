@@ -214,6 +214,47 @@ For a $400k S-corp owner, the combined advice across these three could save $30k
 
 The bare answer alone leaves real money on the table because it doesn't know which expert to channel.
 
+## Iteration 5 — Verticals beyond tax: wealth, real estate, legal
+
+Built three more person-agents to test verticals beyond civic / AI / tax:
+- **Naval Ravikant** (wealth + startups) — author of *The Almanack of Naval Ravikant*, AngelList founder, distinctive "specific knowledge + leverage" framework.
+- **Pace Morby** (real estate creative finance) — YouTuber teaching subject-to, seller financing, the SubTo community.
+- **Ben Hall** (traffic law, Michigan) — picked by discover_people from "fight a speeding ticket" research; ex-Marine, ex-cop, ex-prosecutor turned defense lawyer.
+
+### AHA #4 — Naval: "You're not going to get rich renting out your time"
+
+Query: *"I'm a software engineer making $200k/year with $100k saved. Everyone says diversify into index funds and wait 30 years. Is that the best move for real wealth, or am I missing something bigger?"*
+
+| | Output |
+|---|---|
+| **bare** | 10-point list: index funds, emergency fund, debt management, real estate, upskilling, alternative investments, tax efficiency, financial advisor. "Tailor your strategy and seek professional advice." |
+| **Naval agentic** | 6 points centered on Naval's actual framework: **"Leverage your specific knowledge"** → build software products beyond your salary; **"focus on ownership"** of assets; alternative investments; long-term thinking. Closes with the verbatim Naval quote: **"You're not going to get rich renting out your time."** |
+
+Strong AHA. Naval's voice and framework are clearly inherited. He's known for the OPPOSITE of mainstream financial advice — don't just index-fund-and-wait, build equity in something you own. Bare model leads with "diversify, emergency fund, advisor." Naval's most famous line shows up in the agentic answer.
+
+### Soft AHA — Pace Morby (subject-to, seller financing)
+
+Query: *"I have $30k saved. I want to start in real estate but can't qualify for a conventional mortgage (poor credit, not enough down). What's a realistic first deal?"*
+
+Both bare and Pace agentic mentioned **subject-to, seller financing, wholesaling, lease options**. The Pace agentic version led with subject-to (his signature) and cited his community/blog sources. The bare model surprisingly covered creative finance pretty well — this is a well-known FAQ in real estate that GPT's training data has soaked up.
+
+Verdict: real AHA exists but softer than tax/wealth verticals because the "non-obvious" content has become mainstream enough that bare GPT knows it. The persona's value is in *ordering and committing* (lead with subject-to vs hedge across 10 options) rather than surfacing unknown strategies.
+
+### Near-miss — Ben Hall (traffic law)
+
+Query: *"Got pulled over going 78 in 65 on I-285 Atlanta GA, written up for reckless driving. Clean record. Fight it, plea, or pay?"*
+
+The agentic Ben Hall **gave weaker advice than bare**. He hedged ("I primarily focus on Michigan traffic law") and gave generic guidance. The bare answer was a more structured 7-step breakdown with specifics on plea bargaining, evidence-gathering, and court prep.
+
+Diagnosis: Ben Hall is a real attorney with a Michigan practice, but his public footprint (firm bio pages, a few articles) didn't contain the YouTube-style tactical advice patterns that would produce an AHA. **Not every discovered person has rich enough material to outperform bare.** This is the "thin-source person" failure mode that nuwa-skill explicitly handles — when the corpus is thin, you should be honest about confidence and not pretend to expertise the persona doesn't have.
+
+Important lesson: **the system needs a "discovery quality" filter.** If discover_people returns a candidate whose source crawls are < some threshold for distinctive content, the system should either:
+- Try a different candidate from the ranked list, OR
+- Surface a list and let the user pick, OR
+- Bias the search toward known-rich-source figures (YouTubers, authors, podcasters with substantial public corpus).
+
+For v2.5, the right move is probably option 2 — show the user the ranked candidates and let them pick which one to build into an agent. Right now discover_people auto-picks top-1, which is greedy.
+
 ## Synthesis — where does the system steer away from the mean?
 
 After three experiments (Lisa Smith/Jeff Niten Mountlake Terrace, Karpathy, 4 SCOTUS justices), the pattern is clear:

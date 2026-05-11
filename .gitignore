@@ -11,6 +11,9 @@ runs/*
 !runs/v2-jeff-niten-mountlake-terrace-20260511T173510Z.md      # v2 iteration-1 evidence (discover_people)
 !runs/v2-andrej-karpathy-20260511T200759Z.md                   # v2 iteration-2 evidence (Karpathy AHA)
 !runs/v2-tax-strategists-comparison-20260511T210000Z.md        # v2 iteration-4 evidence (Augusta Rule AHA)
+!runs/v2-naval-ravikant-20260511T204732Z.md                    # v2 iteration-5 evidence (Naval AHA)
+!runs/v2-pace-morby-20260511T205312Z.md                        # v2 iteration-5 evidence (Pace soft AHA)
+!runs/v2-ben-hall-michigan-traffic-attorney-20260511T205721Z.md # v2 iteration-5 evidence (Ben Hall near-miss)
 .streamlit/
 .DS_Store
 *.egg-info/
