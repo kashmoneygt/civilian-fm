@@ -274,6 +274,58 @@ Each comparison targets a specific person-agent. Future calibration: interview t
 
 Logged to `runs.db` (SQLite). Eval rubric (Appendix D) plumbed in later.
 
+### 2.7 Content discipline — the architecture doesn't guarantee steering
+
+The 3-entity graph **supports** steering away from the mean but doesn't guarantee it. Adding more context can actively pull *toward* the mean if that context is boilerplate. Three hard rules govern what goes in entity wikis:
+
+**Rule 1 — Uniqueness test.** Every fact in any entity's wiki must be **non-obvious to a bare model**. If GPT-4o-mini would generate the fact unprompted from training data, the fact doesn't belong in the wiki. Distillation prompts enforce this directly:
+
+> *"Ignore information that appears on Wikipedia or the official government site. Capture what is NOT obvious from a Google search: specific names, dates, dollar amounts, recent changes, insider behavior patterns, contested claims, hidden gotchas."*
+
+| Steers AWAY from mean (keep) | Steers TOWARD mean (cut) |
+|---|---|
+| "Lisa is strict on setbacks but lenient on decks under 30 sq ft" | "Mountlake Terrace requires permits for structural changes" |
+| "Planning has a 3-week backlog as of Spring 2026" | "The City of Mountlake Terrace is in Snohomish County, WA" |
+| "Lisa prefers email; 24h response time" | "Contact the permit office during business hours" |
+| "March 2026 zoning amendment: deck height max 30 in. above grade" | "Permits ensure projects meet local building codes" |
+| Direct quotes from her in council minutes | The structure of a permit application |
+
+**Rule 2 — Density over volume.** Hard token budgets per entity wiki:
+
+| Entity kind | Soft cap | Hard cap |
+|---|---|---|
+| Topic | 3k tokens | 5k |
+| Role | 5k | 8k |
+| Jurisdiction | 8k | 12k |
+| Person | 15k | 25k (this is the agent's home base) |
+
+If a wiki overflows, the distillation has accepted boilerplate. Re-curate; don't raise the cap.
+
+**Rule 3 — Selective resolution.** The runtime does NOT blindly load all linked wikis. `skills.md` declares **which links to follow per query type**:
+
+```markdown
+## When to pull which links
+
+- Asked about transformers → load [[topic:ai-ml/transformers]]
+- Asked about Tesla autonomy → load [[role:tesla-director-of-ai]] (era-specific context)
+- Asked about teaching style → no link load needed; persona alone
+```
+
+This matches Cognition's "isolation" pattern — split context per query, don't stuff everything every time.
+
+### 2.8 The dashboard catches steering failures
+
+The 4-variant comparison is the empirical check on whether content discipline is working. **If `stuffed` beats `agentic`** for a person-agent on multiple queries, that's our signal: the curated wiki has too much boilerplate, and the unconstrained dump is winning despite being unfocused. Loop:
+
+```
+build entities → run comparison → 
+  if agentic >> stuffed: ship
+  if agentic ≈ stuffed: re-curate (cut boilerplate, tighten uniqueness test)
+  if stuffed > agentic: the scoped wiki is leaving real signal on the table; either expand scope or refactor persona's link-selection rules
+```
+
+This is the empirical answer to "is the architecture actually steering?" Without measuring against `stuffed` and `bare`, we'd be flying blind.
+
 ---
 
 ## 3. v1 history (shipped 2026-05-10, replaced by v2)
@@ -432,6 +484,10 @@ When prompting Claude Code on this repo:
 - **People-shaped agents only.** No domain-shaped agents (`agents/tax-advisor/`-style). Every conversational agent represents a real or composite person with a `persona.md`, `skills.md`, and growing `wiki/`.
 - **People are flat — they never move.** When a person's role changes, update their frontmatter (end old role-edge, add new role-edge). Do not move directories. Do not rename slugs without a rewrite of all `[[person:...]]` references.
 - **Roles, jurisdictions, and topics are separate entities.** Each has its own `overview.md` + `wiki/`. People reference them via frontmatter and `[[...]]` body syntax. Don't put role-specific or jurisdiction-specific knowledge inside a person's wiki — it belongs in the role/jurisdiction entity.
+- **Uniqueness test on every entity fact.** If GPT would generate the fact from training data, the fact doesn't belong in the wiki. Boilerplate IS the mean — adding it actively hurts the steering. See Section 2.7.
+- **Respect entity wiki token budgets** (Section 2.7 Rule 2). Overflow means boilerplate crept in; re-curate, don't raise the cap.
+- **Selective resolution of cross-references.** Persona's `skills.md` says which `[[...]]` links to follow per query type. Don't stuff everything every time.
+- **Watch the `stuffed` column.** If stuffed ever ties or beats agentic in the dashboard, the entity content has drifted toward the mean. That's the empirical signal to re-curate.
 - **Stay in vertical-slice mode.** Don't build all entity kinds before the first person-agent runs end-to-end.
 - **Don't introduce abstractions** until there are at least three concrete instances of the thing being abstracted. The processor pipeline pattern (Appendix C) applies only to multi-step agents like the researcher — never to single-call agents.
 - **Cite from the entity's wiki, not from training data.** If an agent answers without citing, the harness is broken.
