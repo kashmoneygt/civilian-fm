@@ -1,119 +1,51 @@
-"""CLI: run the researcher pipeline on a goal or a URL.
+"""CLI: run the researcher unified pipeline on a goal or a URL.
 
 Usage:
-    uv run python -m scripts.research "i want a building permit for a deck in Mountlake Terrace WA"
+    uv run python -m scripts.research "i want to learn from naval ravikant"
     uv run python -m scripts.research --url "https://www.youtube.com/watch?v=GCygktDbU3Q"
+
+Both entry points produce list[EntitySeed] then build each seed.
 """
 from __future__ import annotations
 
 import argparse
-import json
 import sys
-import time
 
-from researcher.pipeline import Request, run
-from researcher.pipelines import GOAL_PIPELINE
-from researcher.processors import distill, identify, research
-
-
-def run_goal(goal: str) -> Request:
-    print(f"\n=== Goal pipeline: {goal!r}\n")
-    req = Request(user_goal=goal)
-    for step in GOAL_PIPELINE:
-        t0 = time.time()
-        name = step.__module__.split(".")[-1]
-        print(f"  -> {name}...", end="", flush=True)
-        try:
-            req = step(req)
-        except Exception as e:
-            print(f" ERR ({e!r})")
-            raise
-        print(f" {time.time() - t0:.1f}s")
-    return req
-
-
-def run_url(url: str) -> Request:
-    print(f"\n=== URL pipeline: {url}\n")
-    from researcher.processors import crawl_url, extract_entities
-
-    req = Request(user_url=url)
-    print("  -> crawl_url...", end="", flush=True)
-    t0 = time.time()
-    req = crawl_url.run(req)
-    print(f" {time.time() - t0:.1f}s")
-
-    print("  -> extract_entities...", end="", flush=True)
-    t0 = time.time()
-    req = extract_entities.run(req)
-    print(f" {time.time() - t0:.1f}s")
-
-    extracted = req.state["extracted_entities"]
-    print(f"\nExtracted: {len(extracted.get('people', []))} people, {len(extracted.get('topics', []))} topics")
-    for p in extracted.get("people", [])[:8]:
-        print(f"  person: {p['name']} ({p['slug']}) — {p.get('role_hint', '')}")
-    for t in extracted.get("topics", [])[:6]:
-        print(f"  topic:  {t['name']} ({t['slug']})")
-
-    # Sub-loop: run identify (pre-resolved target) + research + distill for each person.
-    for p in extracted.get("people", [])[:8]:
-        sub_req = Request(user_goal=f"{p['name']} — {p.get('role_hint', '')}")
-        sub_req.state["target"] = {
-            "target_kind": "person",
-            "person_name_hint": p["name"],
-            "person_slug": p["slug"],
-            "role_slug": (p.get("role_hint") or "unknown-role").lower().replace(" ", "-")[:60],
-            "role_overview": p.get("role_hint", ""),
-            "jurisdiction_path": None,
-            "jurisdiction_overview": "",
-            "domains": [],
-            "search_queries": p.get("search_queries", []),
-        }
-        print(f"\n  ## researching person: {p['name']}")
-        sub_req = research.run(sub_req)
-        print(f"     sources: {sub_req.state.get('source_count', 0)}  (thin={sub_req.state.get('thin_source')})")
-        sub_req = distill.run(sub_req)
-        if "person_dir" in sub_req.state:
-            print(f"     wrote: {sub_req.state['person_dir']}")
-        elif "distill_error" in sub_req.state:
-            print(f"     skipped: {sub_req.state['distill_error']}")
-
-    # Topics: same pattern but simpler (no persona)
-    # For v2 first cut we skip topic distillation — covered in a later iteration.
-
-    return req
+from researcher.pipelines import BUILD_ENTITY, GOAL_DISCOVERY, URL_DISCOVERY
+from researcher.runner import run
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("input", nargs="?", help="user goal text (omit if --url is given)")
-    ap.add_argument("--url", help="entry point URL for URL-mode pipeline")
-    ap.add_argument("--json", action="store_true", help="dump final state as JSON")
+    ap.add_argument("input", nargs="?", help="user goal (omit if --url is given)")
+    ap.add_argument("--url", help="URL entry point")
+    ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
 
     if args.url:
-        req = run_url(args.url)
+        result = run(URL_DISCOVERY, BUILD_ENTITY, user_url=args.url, verbose=not args.quiet)
     elif args.input:
-        req = run_goal(args.input)
+        result = run(GOAL_DISCOVERY, BUILD_ENTITY, user_goal=args.input, verbose=not args.quiet)
     else:
         ap.print_help()
         return 2
 
-    print("\n=== Result\n")
-    candidates = req.state.get("candidates", [])
-    if candidates:
-        print("Person candidates discovered:")
-        for c in candidates[:5]:
-            print(f"  - [{c.get('relevance_score', 0):>2}] {c['name']} — {c.get('role_hint', '')} ({c.get('source_file', '')})")
-        print(f"  PICKED: {candidates[0]['name']}")
-    if "person_dir" in req.state:
-        print(f"\nBuilt person-agent at: {req.state['person_dir']}")
-    if "initial_answer" in req.state:
+    print("\n=== Result ===\n")
+    for b in result["built"]:
+        seed = b["seed"]
+        dir_ = b.get("person_dir") or b.get("topic_dir")
+        mark = " (primary)" if seed.primary else ""
+        if dir_:
+            print(f"  ✓ {seed.kind}: {seed.name}{mark} → {dir_}")
+        elif b.get("error"):
+            print(f"  ✗ {seed.kind}: {seed.name}{mark} — ERROR: {b['error']}")
+        else:
+            print(f"  ? {seed.kind}: {seed.name}{mark} — (no output)")
+
+    primary = next((b for b in result["built"] if b["seed"].primary and b.get("initial_answer")), None)
+    if primary:
         print("\n--- initial answer ---\n")
-        print(req.state["initial_answer"])
-    if args.json:
-        printable = {k: (v if isinstance(v, (str, int, float, bool, list, dict, type(None))) else repr(v)) for k, v in req.state.items()}
-        print("\n--- state ---\n")
-        print(json.dumps(printable, indent=2, default=str))
+        print(primary["initial_answer"])
     return 0
 
 

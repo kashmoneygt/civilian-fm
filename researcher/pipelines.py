@@ -1,22 +1,48 @@
-"""Composed pipelines."""
+"""Composed pipelines.
+
+Unified DAG: both entry points produce a list[EntitySeed], then each seed
+flows through the same BUILD_ENTITY sub-pipeline.
+
+Run via researcher.runner.run(discovery, BUILD_ENTITY, ...)
+"""
 from __future__ import annotations
 
-from .pipeline import run, Request
-from .processors import answer, clarify, crawl_url, discover_people, distill, extract_entities, identify, research
+from .processors import (
+    answer,
+    broad_research,
+    clarify,
+    crawl_url,
+    discover_people,
+    distill,
+    extract_entities,
+    identify,
+    refine_subject,
+    seeds_from_extraction,
+    seeds_from_target,
+    targeted_research,
+)
 
-GOAL_PIPELINE = [
+# --- Discovery pipelines (entry-specific) ---
+
+GOAL_DISCOVERY = [
     clarify.run,
     identify.run,
-    research.run,
-    discover_people.run,  # NEW — scan crawls for named individuals; prefer over composite
-    distill.run,
-    answer.run,
+    seeds_from_target.run,
 ]
 
-URL_PIPELINE = [
+URL_DISCOVERY = [
     crawl_url.run,
     extract_entities.run,
-    # For each extracted entity, the dispatcher runs identify-with-pre-resolved-target +
-    # research + distill. Implemented in scripts/research.py rather than as a single
-    # processor (variable-length subloop is cleaner outside the linear pipeline).
+    seeds_from_extraction.run,
+]
+
+# --- Build sub-pipeline (shared, per seed) ---
+
+BUILD_ENTITY = [
+    broad_research.run,
+    discover_people.run,    # may refine the seed (if seed didn't have a specific person name yet)
+    refine_subject.run,     # LLM identifies canonical sources + targeted queries
+    targeted_research.run,  # pass 2: deepen
+    distill.run,
+    answer.run,             # only fires for the primary seed
 ]

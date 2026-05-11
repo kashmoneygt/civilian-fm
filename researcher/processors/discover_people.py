@@ -109,12 +109,20 @@ def _looks_like_human_name(s: str | None) -> bool:
 
 
 def run(req: Request) -> Request:
-    target = req.state.get("target", {})
-    # If identify already pinned a real named individual (e.g. a public figure), respect it.
-    if _looks_like_human_name(target.get("person_name_hint")):
+    # v3: operates on the per-seed Request inside the BUILD sub-pipeline.
+    seed = req.state.get("seed")
+    if seed is None:
+        return req  # no seed — nothing to refine
+
+    # If the seed already has a real named individual, respect it.
+    if _looks_like_human_name(seed.name):
         return req
 
-    crawled = req.state.get("crawled", [])
+    # Also only run for person-kind seeds (topics don't need a name discovery pass).
+    if seed.kind != "person":
+        return req
+
+    crawled = req.state.get("broad_crawled", []) or req.state.get("crawled", [])
     pages_block = _build_pages_block(crawled)
     if not pages_block:
         req.state["candidates"] = []
@@ -122,10 +130,10 @@ def run(req: Request) -> Request:
 
     out = complete_json(
         PROMPT.format(
-            goal=req.user_goal,
-            jurisdiction=target.get("jurisdiction_path") or "(none)",
-            role_overview=target.get("role_overview", ""),
-            domains=target.get("domains", []),
+            goal=seed.origin_goal or seed.origin_url or "",
+            jurisdiction=seed.jurisdiction_path or "(none)",
+            role_overview=seed.role_hint or "",
+            domains=seed.domains,
             pages=pages_block,
         ),
         temperature=0.0,
@@ -138,16 +146,11 @@ def run(req: Request) -> Request:
 
     if candidates:
         pick = candidates[0]
-        target["person_name_hint"] = pick["name"]
-        target["person_slug"] = _slugify(pick.get("slug") or pick["name"])
-        # The chosen person's ACTUAL role replaces the goal-derived role.
-        # Steve Woodard is a Mayor, not a permit-specialist — even if the goal was about permits.
-        # The mayor-agent answers permit questions in their capacity as an elected official
-        # who can direct constituents; the role wiki captures that distinction.
+        # Update the seed in place. The chosen person's ACTUAL role replaces the goal-derived role.
+        seed.name = pick["name"]
+        seed.slug = _slugify(pick.get("slug") or pick["name"])
         role_hint = pick.get("role_hint") or ""
         if role_hint:
-            target["role_slug"] = _slugify(role_hint)
-            target["role_overview"] = role_hint
-        target["picked_from_candidates"] = True
-        req.state["target"] = target
+            seed.role_slug = _slugify(role_hint)
+            seed.role_hint = role_hint
     return req

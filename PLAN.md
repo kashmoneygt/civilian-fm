@@ -1,6 +1,8 @@
 # civilian-fm: Plan & Context
 
-> "Palantir for civilians" — a system where everyday people navigate bureaucratic friction by chatting with person-agents (real or composite) distilled from public sources, user contributions, and (eventually) AI-conducted interviews. A 4-variant dashboard (bare / persona / stuffed / agentic) measures how much each layer of the harness contributes.
+> "Palantir for civilians" — a system where everyday people navigate bureaucratic friction by chatting with person-agents (real or composite) distilled from public sources, user contributions, and (eventually) AI-conducted interviews. A 4-variant dashboard (bare / search / persona / agentic) measures how much each layer of the harness contributes — including against a Perplexity-style web-search baseline.
+
+**The moat is the pipeline, not the persona.** Anyone with a frontier model and a search tool can ask "what would Karpathy say?" once. Our value is the **intelligent crawler + curated LLM-wiki + multi-pass research** that pre-builds the right expert for the right question, so at query time the agent already has the right voice and the right corpus. The persona itself could be distilled by anyone; the way we *find, deepen, organize, and grow* its source material is the product.
 
 This document is both a reference for humans and context for Claude Code prompts. Keep it terse; update it when decisions change.
 
@@ -249,28 +251,56 @@ def run(processors: list[Processor], req: Request) -> Request:
 
 Two pipelines share primitives. **Same `research` and `distill` processors** work for both entry points and both entity kinds (people, topics).
 
-**Goal pipeline** ("I want a permit"):
+**Unified DAG — every pipeline reduces to: discover seeds → build each entity:**
+
 ```
-clarify → identify_target → research → distill → answer → spawn_chat
+GOAL_DISCOVERY = clarify → identify → seeds_from_target
+URL_DISCOVERY  = crawl_url → extract_entities → seeds_from_extraction
+
+BUILD_ENTITY (per seed) = broad_research → refine_subject → targeted_research → distill
+
+OUTPUT = build_entity(seed_0) primary  →  answer_initial_query(primary_agent)
 ```
 
-**URL pipeline** ("create people from this video"):
-```
-crawl_url → extract_entities → (for each: research → distill) → summary
-```
+Both entry points produce a `list[EntitySeed]`. An `EntitySeed` describes "the entity to build" — name, slug, kind (person/topic), role hint, jurisdiction hint, domains, search queries, seed context (the URL/transcript/raw page we came from). After discovery, EVERY seed flows through the same `build_entity` sub-pipeline. The URL pipeline is no longer a special case — it just produces more seeds.
 
-Convergence: both pipelines produce populated `entities/` directories that the user can chat with.
+**Why the new shape:**
 
-### 2.6 Dashboard — 4-variant comparison
+- The URL pipeline previously had a "for each entity, manually loop" hack in `scripts/research.py`. That's now part of the framework.
+- A seed is a stable hand-off contract between discovery and build. Future entry points (e.g., "extract entities from a podcast feed") plug in by emitting seeds.
+- The build sub-pipeline is now **iterative** (broad → refine → targeted) rather than one-shot. This is where the intelligent-crawling moat lives.
 
-| Variant | Persona | Knowledge |
-|---|---|---|
-| **bare** | — | — |
-| **persona** | full `persona.md` | — |
-| **stuffed** | "you are a helpful assistant" | all of the entity's `wiki/` dumped in |
-| **agentic** | full `persona.md` | scoped via persona cross-references |
+### 2.5.1 Intelligent crawling — the actual moat
 
-Each comparison targets a specific person-agent. Future calibration: interview the actual person, score which variant matches their real answer best.
+Frontier labs can copy our persona schema. They cannot easily copy how we *find, deepen, and organize* per-person source material. Three crawling moves matter:
+
+1. **Two-pass research per seed.**
+   - **Pass 1 (broad)**: search seed queries → top-K hits → crawl all. Get a rough picture.
+   - **Refine subject**: LLM reads broad results → confirms the actual primary subject + identifies that subject's *canonical sources* (their own site, their books, their podcast, their YouTube channel, key essays/papers).
+   - **Pass 2 (targeted)**: search and crawl *those specific sources* directly. Deepen on the verified subject.
+
+2. **Source-authority routing.** When researching Tom Wheelwright, prefer `tomwheelwright.com`, `wealthability.com`, his published book pages, his podcast — over random third-party blogs *about* him. Each crawl prefers primary sources over secondary mentions.
+
+3. **Wiki growth, not wiki replacement.** Each rebuild appends to and reorganizes the entity's wiki rather than overwriting. The wiki accumulates curated knowledge over time (Karpathy LLM-wiki pattern, Appendix B). Future user contributions and AI interview transcripts feed into the same growing wiki.
+
+The crawler stays dumb (fetch URL → markdown). The intelligence is in the **research processors** that decide what to fetch, when to stop the broad pass, what to deepen, and how to organize.
+
+### 2.6 Dashboard — 4-variant comparison (revised)
+
+**`stuffed` is removed.** It was never a meaningful baseline — it's an architectural anti-pattern (context rot) rather than something a real user would do. Replaced with **`bare_search`**, which is what a real user actually does today (Perplexity, ChatGPT-with-Browsing, Gemini-with-search).
+
+| Variant | What it represents | Tools | System prompt |
+|---|---|---|---|
+| **bare** | "What if I just ask ChatGPT?" | none | none |
+| **bare_search** | "What if I just ask Perplexity?" — a generic LLM with web search | `web_search`, `fetch_url` | minimal "you may search the web to ground answers" |
+| **persona** | Isolated persona effect — voice/framework alone | none | full `persona.md` body |
+| **agentic** | The full product: persona + curated wiki accessed via tools | `read_wiki_file`, `read_linked_entity` | persona + skills + index of available wiki/linked entities |
+
+Each variant is a real-world alternative the user could pick. The hypothesis we test:
+
+- **agentic beats bare** on every domain (already validated for AI/ML, tax, wealth, civic, SCOTUS).
+- **agentic beats bare_search** on *signature-strategy questions* — Augusta Rule, Cash Balance Plan, Karpathy's nanoGPT — because we've pre-routed to the expert AND pre-organized their corpus. Perplexity has to discover the expert AND surface the strategy in one search hop.
+- **agentic ties bare_search** on common factual questions — that's expected. Our edge is non-obvious, person-specific knowledge.
 
 Logged to `runs.db` (SQLite). Eval rubric (Appendix D) plumbed in later.
 
@@ -360,91 +390,100 @@ civilian-fm/
       youtube/<vid>.md
       web/<slug>.md
 
-  entities/                                       # NEW — knowledge graph nodes (4 kinds)
-    _base.py                                      # PersonAgent class
+  entities/                                       # knowledge graph nodes
+    _agent.py                                     # ToolPersonAgent — single agent class, tool-call based
     _refs.py                                      # resolve [[role:...]] / [[jur:...]] / [[topic:...]] / [[person:...]]
-    people/                                       # FLAT, never reorganized
-      <slug>/                                     # globally-unique slug; disambiguated if needed
-        persona.md                                # frontmatter declares roles/jurisdictions/domains
-        skills.md
-        wiki/
-        agent.py
-    roles/                                        # what people do / have done
-      <role-slug>/
-        overview.md
-        wiki/
-    jurisdictions/                                # hierarchical (federal -> state -> county -> city)
-      us/overview.md
-      us/ga/overview.md
-      us/ga/cherokee-county/overview.md
-      us/wa/mountlake-terrace/overview.md
-    topics/                                       # concepts
-      <domain>/<topic>/
-        overview.md
-        wiki/
+    people/<slug>/                                # FLAT; never reorganized
+      persona.md  skills.md  wiki/                # persona, skills, growing per-person corpus
+    roles/<slug>/                                 # role overview + wiki
+    jurisdictions/<path>/                         # hierarchical, federal -> state -> county -> city
+    topics/<domain>/<topic>/                      # concept overview + wiki
 
-  researcher/                                     # NEW — pipeline that builds entities
-    pipeline.py                                   # ~30 LOC framework
+  researcher/                                     # pipeline that builds entities
+    seed.py                                       # EntitySeed dataclass — hand-off between discovery and build
+    runner.py                                     # unified runner: discover → for-each(seed): build_entity
+    pipelines.py                                  # GOAL_DISCOVERY, URL_DISCOVERY, BUILD_ENTITY composed
+    search.py                                     # DDGS wrapper used by both research and the bare_search runner
+    llm.py                                        # LiteLLM + JSON-mode helper
     processors/
-      clarify.py                                  # ask 1-3 questions if goal is ambiguous
-      identify.py                                 # goal -> entity reference (search + LLM)
-      crawl_url.py                                # URL-mode entry
-      extract_entities.py                         # raw content -> {people: [...], topics: [...]}
-      research.py                                 # nuwa-style sub-crawls per dimension (with thin-source adaptation)
-      distill.py                                  # build persona.md / overview.md + wiki
-      answer.py                                   # initial response
-      spawn_chat.py                               # hand off to PersonAgent
-    pipelines.py                                  # GOAL_PIPELINE, URL_PIPELINE
+      discovery_goal/                             # for the goal entry point
+        clarify.py
+        identify.py
+        discover_people.py
+        seeds_from_target.py                      # emits EntitySeed[]
+      discovery_url/                              # for the URL entry point
+        crawl_url.py
+        extract_entities.py
+        seeds_from_extraction.py                  # emits EntitySeed[]
+      build/                                      # the shared per-seed build sub-pipeline
+        broad_research.py                         # pass 1: search seed.queries, crawl top hits
+        refine_subject.py                         # LLM reads broad results, identifies canonical sources
+        targeted_research.py                      # pass 2: crawl the canonical sources directly
+        distill.py                                # produces persona.md / overview.md + skills.md
+        answer.py                                 # initial response from the new agent (primary seed only)
 
   dashboard/                                      # 4-variant comparison
-    runners.py                                    # bare / persona / stuffed / agentic
-    store.py
-    app.py
+    runners.py                                    # bare / bare_search / persona / agentic (all 4 are real-world alternatives)
+    web_tools.py                                  # web_search + fetch_url tools used by bare_search runner
+    store.py                                      # SQLite run log
+    app.py                                        # Streamlit UI
 
   scripts/
-    research.py                                   # CLI for GOAL or URL pipeline
-    run_comparison.py                             # 4-runner CLI
+    research.py                                   # CLI for goal or URL entry (calls runner.run)
+    chat.py                                       # interactive REPL chat (uses ToolPersonAgent, --trace shows tool calls)
+    run_comparison.py                             # 4-runner CLI (bare / bare_search / persona / agentic)
 
-  runs/  /  runs.db                               # comparison reports (gitignored except evidence)
+  runs/  /  runs.db                               # comparison reports (gitignored except tracked evidence)
 ```
 
 ---
 
-## 5. v2 Build Order
+## 5. v3 Build Order (current — supersedes v2 build order)
 
-Each step has a concrete verification. Don't move on without it.
+The v2 system shipped and produced 4 documented AHA moments (Karpathy, SCOTUS, Augusta Rule, Naval) — see V2_RUN_REPORT.md. Two architectural problems surfaced that v3 fixes:
 
-1. **Delete v1 tax-advisor artifacts.** No backwards compatibility.
-   - *Verify:* `agents/tax-advisor/` and `wiki/topics/taxes/` gone. `dashboard/runners.py` doesn't import tax-advisor.
+1. The 4 variants weren't right. `stuffed` is an architectural anti-pattern (context rot) not a real baseline. The actual realistic baseline is **a generic LLM with web search** (Perplexity-style). v3 replaces `stuffed` with `bare_search`.
+2. The URL pipeline had a hack — `scripts/research.py` manually looped over extracted entities, bypassing the processor framework. v3 unifies: both entry points emit `EntitySeed[]`, then a shared `build_entity` sub-pipeline runs per seed.
 
-2. **`entities/_base.py` — PersonAgent class** (~60 LOC) + **`entities/_refs.py` — cross-reference resolver** (~40 LOC).
-   - *Verify:* Can instantiate `PersonAgent(Path("entities/people/test/"))` with stub files and call `.chat("hi")`. The resolver loads any `[[role:...]] / [[jur:...]] / [[topic:...]]` references into context.
+Plus a new conviction: **the moat is the pipeline, not the persona.** v3 introduces two-pass crawling (broad → refine → targeted) so we actually beat `bare_search` on signature-strategy questions.
 
-3. **`researcher/pipeline.py` — processor framework** (~30 LOC).
-   - *Verify:* `run([lambda r: r], Request("test"))` returns the request unchanged.
+### v3 steps
 
-4. **First processors — `clarify`, `identify`, `research`, `distill`.** ~50 LOC each.
-   - *Verify clarify:* ambiguous goal → 1-3 questions; clear goal → no questions.
-   - *Verify identify:* "permits in Mountlake Terrace WA" → returns a target person reference *and* creates `entities/roles/mountlake-terrace-permit-specialist/` + `entities/jurisdictions/us/wa/mountlake-terrace/` if missing.
-   - *Verify research:* spawns parallel crawls, writes both `wiki/raw/` and `entities/people/<slug>/wiki/public/` files. Gracefully degrades for thin-source targets (nuwa adaptation, Appendix A).
-   - *Verify distill:* produces a `persona.md` following the nuwa 12-section schema with frontmatter declaring `roles`, `jurisdictions`, `domains`, `linked_topics`.
+1. **Wipe v2 entity content** (no backcompat). Keep `wiki/raw/` (immutable). Keep `crawler/` (unchanged).
 
-5. **First vertical — Lisa Smith (Mountlake Terrace permit office) end-to-end.**
-   - *Verify:* `python -m scripts.research "i want to create a permit for a deck in Mountlake Terrace WA"` populates `entities/people/lisa-smith-mountlake-terrace-permit/` with a persona linking to `[[role:mountlake-terrace-permit-specialist]]` and `[[jur:us/wa/mountlake-terrace]]`.
-   - *Verify:* `python entities/people/lisa-smith-mountlake-terrace-permit/agent.py` opens a chat with Lisa.
+2. **`entities/_agent.py`** — single ToolPersonAgent class. Delete `_base.py` (the dump-everything version). Tool-call observability is non-negotiable now.
 
-6. **Second vertical — Karpathy (control case for source-abundant target).**
-   - *Verify:* Same pipeline, no code changes, populates `entities/people/karpathy/` with multiple role-edges (`ai-researcher`, `tesla-director-of-ai`, `openai-cofounder`) and `[[topic:...]]` cross-references that resolve cleanly.
+3. **`researcher/seed.py`** — `EntitySeed` dataclass. The hand-off contract between discovery and build.
 
-7. **URL pipeline + entity extraction.**
-   - *Verify:* `python -m scripts.research --url "https://www.youtube.com/watch?v=GCygktDbU3Q"` creates person-entities for Roberts, Sotomayor, Trump, Barbara, Sour; role-entities like `us-supreme-court-justice`, `us-solicitor-general`; topic-entities for `14th-amendment-citizenship` and `birthright-citizenship`.
-   - *Verify:* Trump's persona links to `[[topic:constitutional-law/14th-amendment-citizenship]]` and `[[role:us-president]]`; loading Trump-agent pulls both wikis in.
+4. **`researcher/runner.py`** — unified runner. Takes a list of discovery processors plus the BUILD_ENTITY sub-pipeline. Returns `list[built_entity_dir]`.
 
-8. **Dashboard — 4 variants targeting person-agents.**
-   - *Verify:* Streamlit page lets you pick an entity, runs bare/persona/stuffed/agentic against a query, shows visible delta. Logs to `runs.db`.
+5. **Restructure processors** under `researcher/processors/`:
+   - `discovery_goal/`: clarify, identify, discover_people, seeds_from_target
+   - `discovery_url/`: crawl_url, extract_entities, seeds_from_extraction
+   - `build/`: broad_research, refine_subject, targeted_research, distill, answer
 
-9. **Cross-reference resolution at runtime.**
-   - *Verify:* When chatting with Karpathy-agent about transformers, the response cites both Karpathy's wiki and the linked transformers topic wiki.
+6. **Two-pass crawling** in `build/`:
+   - `broad_research` — search seed.queries, crawl top hits, write to wiki/raw/
+   - `refine_subject` — LLM call. Reads broad results, identifies primary subject's canonical sources (their own site, podcast, book pages, YouTube channel).
+   - `targeted_research` — crawl those canonical sources directly.
+
+7. **`dashboard/web_tools.py`** — `web_search(query)` and `fetch_url(url)` tools. Used by the `bare_search` runner.
+
+8. **`dashboard/runners.py`** — rewrite for 4 new variants:
+   - `bare` — plain LLM call.
+   - `bare_search` — LLM with `web_search` + `fetch_url` tools. No persona. The Perplexity baseline.
+   - `persona` — LLM with persona system prompt. No tools, no wiki.
+   - `agentic` — ToolPersonAgent. Persona + wiki tools.
+
+9. **Rebuild test verticals end-to-end:**
+   - Naval — verify two-pass crawling pulls from `nav.al`, his podcast pages, and Almanack book site, not just third-party blogs.
+   - Karpathy — verify it pulls from karpathy.ai, his GitHub, his YouTube channel content directly.
+
+10. **Run new 4-variant comparison** on the queries that already AHA'd:
+    - Karpathy: "what specific repos and tools of yours should I use?"
+    - Naval: "should I index-fund or build a side project?"
+    - Karlton Dennis: "what 2-3 non-obvious tax strategies for my $400k S-corp?"
+    - **Expected**: `agentic` clearly beats `bare_search` on the signature-strategy answer (Augusta Rule, nanoGPT recommendation, "you're not going to get rich renting out your time"). If `bare_search` ties on the Augusta Rule, the two-pass crawling didn't add enough signal — iterate.
 
 ---
 

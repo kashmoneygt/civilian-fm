@@ -1,6 +1,6 @@
 ---
 source: web
-fetched_at: '2026-05-11T20:40:15Z'
+fetched_at: '2026-05-11T23:33:16Z'
 url: https://polaristaxandaccounting.com/tax-reduction-strategies-small-business/
 title: Top 10 Tax Reduction Strategies for Small Businesses | Polaris Tax & Accounting
   - Polaris Tax & Accounting

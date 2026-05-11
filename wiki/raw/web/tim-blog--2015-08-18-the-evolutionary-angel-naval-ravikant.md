@@ -1,6 +1,6 @@
 ---
 source: web
-fetched_at: '2026-05-11T20:45:47Z'
+fetched_at: '2026-05-11T23:29:51Z'
 url: https://tim.blog/2015/08/18/the-evolutionary-angel-naval-ravikant/
 title: Naval Ravikant — The Person I Call Most for Startup Advice (#97) - The Blog
   of Author Tim Ferriss

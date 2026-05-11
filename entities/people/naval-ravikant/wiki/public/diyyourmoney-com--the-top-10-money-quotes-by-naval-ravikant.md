@@ -1,6 +1,6 @@
 ---
 source: web
-fetched_at: '2026-05-11T20:45:47Z'
+fetched_at: '2026-05-11T23:29:49Z'
 url: https://diyyourmoney.com/the-top-10-money-quotes-by-naval-ravikant/
 title: Naval Ravikant's top 10 money Quotes for Wealth Building
 domain: diyyourmoney.com

@@ -1,6 +1,6 @@
 ---
 source: web
-fetched_at: '2026-05-11T20:45:49Z'
+fetched_at: '2026-05-11T23:29:50Z'
 url: https://incomeivy.beehiiv.com/p/scale-naval-ravikant-startup-advice
 title: 'Before You Scale, Read This: Naval Ravikant’s Startup Advice'
 domain: incomeivy.beehiiv.com

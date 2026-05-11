@@ -1,6 +1,6 @@
 ---
 source: web
-fetched_at: '2026-05-11T20:40:07Z'
+fetched_at: '2026-05-11T23:33:18Z'
 url: https://karltondennis.com/
 title: Karlton Dennis | Tax Strategist | Home
 domain: karltondennis.com

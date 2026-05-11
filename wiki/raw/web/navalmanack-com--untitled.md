@@ -1,6 +1,6 @@
 ---
 source: web
-fetched_at: '2026-05-11T20:45:48Z'
+fetched_at: '2026-05-11T23:29:51Z'
 url: https://www.navalmanack.com/
 title: Almanack of Naval Ravikant
 domain: navalmanack.com

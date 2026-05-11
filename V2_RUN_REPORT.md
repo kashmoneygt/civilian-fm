@@ -255,6 +255,54 @@ Important lesson: **the system needs a "discovery quality" filter.** If discover
 
 For v2.5, the right move is probably option 2 — show the user the ranked candidates and let them pick which one to build into an agent. Right now discover_people auto-picks top-1, which is greedy.
 
+## Iteration 6 — v3 architecture: bare_search baseline, unified DAG, two-pass crawling
+
+Per user feedback after iterations 1-5, two architectural problems and one strategic concern:
+1. The `stuffed` variant was an architectural anti-pattern (context rot), not a real baseline. **The real baseline is Perplexity/ChatGPT-with-search.**
+2. The URL pipeline had a manual loop hack outside the processor framework.
+3. The moat — if any — is **intelligent crawling + curated wiki**, not the persona itself (which any frontier lab could distill).
+
+### v3 changes shipped
+
+- **`stuffed` removed.** New 4-variant set: `bare`, `bare_search` (LLM with `web_search` + `fetch_url` tools — Perplexity-like), `persona`, `agentic` (ToolPersonAgent with curated wiki tools).
+- **Unified DAG.** Both entry points (goal-mode, URL-mode) now produce `list[EntitySeed]` via a discovery sub-pipeline. After that, EVERY seed runs through the same `BUILD_ENTITY` sub-pipeline: `broad_research → discover_people → refine_subject → targeted_research → distill → answer`. The URL pipeline's manual subloop is gone.
+- **Two-pass crawling.** `refine_subject` reads the broad-pass crawl, identifies the subject's CANONICAL sources (their own site, podcast, books, YouTube channel), and emits targeted queries. `targeted_research` then crawls those.
+
+### AHA #5 — and an honest counter-finding
+
+Rebuilt Karlton Dennis with v3, ran the same S-corp tax query that produced our strongest v2 AHA (Augusta Rule). Result at [runs/v3-karlton-dennis-20260511T233617Z.md](runs/v3-karlton-dennis-20260511T233617Z.md):
+
+| Variant | Augusta Rule? | Tool calls |
+|---|---|---|
+| **bare** | No — gave QBI/HRA/SEP standard checklist | 0 |
+| **bare_search** | **Yes** — found it on molentax.com via web search | 4 |
+| **persona** | No — answered from persona alone, missed it | 0 |
+| **agentic** | **Yes** — found it in polaris wiki source, with verbatim IRC §280A(g) citation | 3 |
+
+**This is important and a little uncomfortable.** Both `bare_search` AND `agentic` surfaced the Augusta Rule. The v2 advantage ("only Karlton agent knows this") collapses when the baseline is a search-equipped LLM rather than a no-tools one.
+
+Where agentic still wins:
+- **Direct IRC section citation** (§280A(g)) from a curated source, not just a general blog reference.
+- **Per-person voice** — agentic speaks as Karlton (first person), bare_search speaks as a generic assistant.
+- **No SEO/spam risk** — agentic queries a pre-curated wiki; bare_search depends on whatever Google ranks today.
+- **Cost predictability** — agentic's wiki is static; bare_search hits live web (and can fail/rate-limit).
+
+Where bare_search ties or beats agentic:
+- **Breadth** — bare_search returned 5 strategies; agentic returned 3. Sometimes you want comprehensive, sometimes focused.
+- **Cost** — bare_search 8,114 prompt tokens; agentic 9,688. Similar, both ~$0.005/query.
+
+### The honest moat (revised)
+
+For factual tax-strategy questions, **the moat is thin against a search-equipped baseline**. Bare_search will find Augusta Rule, will find Cash Balance Plans, will find Cost Segregation. Anything well-indexed by Google is fair game.
+
+The real moat is for queries where the answer requires:
+1. **A specific person's voice and conviction** (Karpathy-on-nanoGPT, Naval-on-leverage, SCOTUS-justice-on-jurisprudence) — bare_search gives generic summaries; agentic speaks as the person.
+2. **Pre-curated cross-references** (loading Karpathy's view AND the linked Transformers topic wiki simultaneously) — bare_search can't pre-organize.
+3. **Knowledge accumulation over time** — every chat with our agent grows the wiki. Bare_search starts fresh every time.
+4. **Information NOT well-indexed** — local-government people (Lisa Smith, Jeff Niten), niche regulatory specifics, anything that won't appear in the top-10 Google results.
+
+The pivot: **stop chasing AHA on factual questions** (search baselines win those eventually). Lean into **persona+voice and obscure-source coverage** (named local officials, role-specific procedural knowledge, multi-turn personality consistency) where bare_search structurally can't compete.
+
 ## Synthesis — where does the system steer away from the mean?
 
 After three experiments (Lisa Smith/Jeff Niten Mountlake Terrace, Karpathy, 4 SCOTUS justices), the pattern is clear:

@@ -1,6 +1,6 @@
 ---
 source: web
-fetched_at: '2026-05-11T20:40:17Z'
+fetched_at: '2026-05-11T23:33:15Z'
 url: https://turbotax.intuit.com/tax-tips/self-employment-taxes/7-ways-small-business-owners-can-reduce-their-tax-bill/L0cYi0OGq
 title: 7 Ways Small Business Owners Can Reduce Their Tax Bill - TurboTax Tax Tips
   & Videos

@@ -1,6 +1,6 @@
 ---
 source: web
-fetched_at: '2026-05-11T20:40:09Z'
+fetched_at: '2026-05-11T23:33:15Z'
 url: https://www.paragonat.com/contact/
 title: Small Business Tax Experts Woodstock, Georgia - Profit First Advisor
 domain: paragonat.com

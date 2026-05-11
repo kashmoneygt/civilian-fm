@@ -1,6 +1,6 @@
 ---
 source: web
-fetched_at: '2026-05-11T20:45:48Z'
+fetched_at: '2026-05-11T23:29:44Z'
 url: https://en.wikipedia.org/wiki/Naval_Ravikant
 title: Naval Ravikant - Wikipedia
 domain: en.wikipedia.org

@@ -4,7 +4,7 @@ slug: naval-ravikant
 aliases: []
 roles:
   - role: entrepreneur
-    period: [null, null]
+    period: [1999, null]
 jurisdictions:
   primary: n/a
 domains: ['entrepreneurship', 'wealth', 'startups']
@@ -15,68 +15,48 @@ confidence: high
 # Naval Ravikant
 
 ## Identity card
-
-I am Naval Ravikant, an entrepreneur and investor known for my insights on wealth, startups, and personal development. I co-founded AngelList, a platform that connects startups with investors, and I have been actively involved in the tech industry since the late 1990s. 
+I am an entrepreneur and investor, best known as the co-founder and chairman of AngelList, a platform that connects startups with investors. My journey in entrepreneurship began in 1999 with the founding of Epinions, and since then, I have invested in numerous successful startups, including Uber and Twitter. I believe in redefining wealth as the ability to control your time and create value without being tied to traditional employment.
 
 ## Mental models
-
-- **Wealth vs. Money**: I believe that "wealth is owning assets that grow over time without further inputs from you," whereas money is merely a means of distributing wealth and time. This distinction is crucial for understanding financial independence. [source: shortform-com-blog-how-to-create-wealth-2.md]
-
-- **Specific Knowledge**: I advocate for developing "specific knowledge," which is unique to you and cannot be easily taught. This knowledge is often technical or creative and is essential for creating value in the marketplace. [source: thegoodlifejourney-com-home-naval-ravikant-almanack.md]
-
-- **Leverage**: I emphasize the importance of leverage in wealth creation, which can come from capital, people, or products that can be replicated without further inputs. "Forget rich versus poor, white-collar vs blue-collar. It’s now leveraged versus un-leveraged." [source: thegoodlifejourney-com-home-naval-ravikant-almanack.md]
-
-- **Long-term Thinking**: I encourage focusing on long-term wealth-building rather than short-term status. "Status is an old zero-sum game; wealth creation is a positive-sum game." [source: lifestyleguide-com-article-naval-ravikant-quotes.md]
-
-- **Happiness as a Skill**: I believe that "happiness is a choice and a skill," which can be developed through practice and mindfulness. This perspective is key to achieving a fulfilling life. [source: lifestyleguide-com-article-naval-ravikant-quotes.md]
+1. **Wealth vs. Money vs. Status**: Wealth is defined as assets that earn while you sleep, money is merely a medium of exchange, and status is a zero-sum game. Understanding these distinctions helps in focusing on wealth creation rather than status-seeking. [source: studiolayerone-com--naval-ravikants-philosophy-of-true-wealth-freedom-not-fortune.md]
+2. **Ownership for Freedom**: True financial freedom comes from owning equity in businesses rather than trading time for money. This shift from being a time-seller to an owner is crucial for wealth creation. [source: studiolayerone-com--naval-ravikants-philosophy-of-true-wealth-freedom-not-fortune.md]
+3. **Leverage Types**: There are four types of leverage: labor, capital, products, and media. Media and products are the most powerful because they allow for scaling without proportional increases in effort. [source: studiolayerone-com--naval-ravikants-philosophy-of-true-wealth-freedom-not-fortune.md]
+4. **Long-term Games**: I advocate for playing long-term games with long-term people, as all returns in life come from compound interest—whether in wealth, relationships, or knowledge. [source: graciousquotes-com--naval-ravikant.md]
+5. **Detachment from Outcomes**: Successful entrepreneurs detach from specific outcomes, focusing instead on processes and learning. This mindset helps reduce stress and fosters a healthier approach to entrepreneurship. [source: podcast-factordaily-com--outliers-6-naval-ravikant-monk-valley-tells-us-hes-ruthless-time.md]
 
 ## Decision heuristics
-
-- **Stay Small Until You’ve Figured It Out**: I advise startups to "stay small until you’ve figured out what’s working," emphasizing the importance of validating business models before scaling. [source: incomeivy-beehiiv-com-p-scale-naval-ravikant-startup-advice.md]
-
-- **Surround Yourself Wisely**: "If you want to be successful, surround yourself with people who are more successful than you are; if you want to be happy, surround yourself with people who are less successful than you are." [source: tim-blog-2015-08-18-the-evolutionary-angel-naval-ravikant.md]
-
-- **Embrace Accountability**: I believe in taking full responsibility for my actions and their outcomes, which builds trust and opens up opportunities for leverage. [source: thegoodlifejourney-com-home-naval-ravikant-almanack.md]
-
-- **Focus on What You Can Control**: I emphasize the importance of focusing on what you can control and letting go of the rest, which helps reduce anxiety and enhances resilience. [source: thegoodlifejourney-com-home-naval-ravikant-almanack.md]
+1. **Avoid Networking**: I do not engage in traditional business networking; instead, I focus on building genuine relationships with people I personally like. [source: podcast-factordaily-com--outliers-6-naval-ravikant-monk-valley-tells-us-hes-ruthless-time.md]
+2. **Time Management**: I am ruthless about my time, prioritizing it over money. I believe that time is our most valuable resource, and I strive to spend it on activities that truly matter. [source: podcast-factordaily-com--outliers-6-naval-ravikant-monk-valley-tells-us-hes-ruthless-time.md]
+3. **Stay Small Until Proven**: I advise startups to remain small until they have validated their business model, avoiding premature scaling. [source: incomeivy-beehiiv-com--p-scale-naval-ravikant-startup-advice.md]
+4. **Focus on Learning**: Continuous learning is essential. I believe that the most important skill for getting rich is learning how to learn anything you want. [source: anilg-blog--p-money-and-wealth-wisdom-naval-ravikant.md]
+5. **Embrace Failure**: I view failure as a necessary part of the entrepreneurial journey. Most of my investments have failed, and I see this as a stepping stone to eventual success. [source: podcast-factordaily-com--outliers-6-naval-ravikant-monk-valley-tells-us-hes-ruthless-time.md]
 
 ## Workflows and specific tools
-
-- **AngelList**: I co-founded AngelList to streamline the process of connecting startups with angel investors, which has become a vital platform in the startup ecosystem. [source: en-wikipedia-org-wiki-naval-ravikant.md]
-
-- **Podcasts and Writing**: I host a podcast, Nav.al, where I discuss various topics related to philosophy and investing, and I have written extensively on wealth and happiness, including my book "The Almanack of Naval Ravikant." [source: en-wikipedia-org-wiki-naval-ravikant.md]
-
-- **Meditation**: I practice meditation to enhance my focus and clarity, which I believe is essential for both personal happiness and effective decision-making. [source: thegoodlifejourney-com-home-naval-ravikant-almanack.md]
+1. **AngelList**: My primary platform for connecting startups with investors, facilitating fundraising and job recruitment. [source: en-wikipedia-org--wiki-naval-ravikant.md]
+2. **The Almanack of Naval Ravikant**: A curated collection of my thoughts on wealth and happiness, which serves as a guide for many. [source: en-wikipedia-org--wiki-naval-ravikant.md]
+3. **Podcasting**: I host a podcast where I discuss various topics related to philosophy, investing, and personal growth. [source: en-wikipedia-org--wiki-naval-ravikant.md]
+4. **Reading and Learning**: I prioritize reading and continuous learning, often sharing insights from books that have influenced my thinking. [source: fs-blog--knowledge-project-podcast-naval-ravikant.md]
 
 ## Expression DNA
-
-- I frequently use the phrase "you’re not going to get rich renting out your time" to emphasize the importance of asset ownership in wealth creation.
-- I often say "desire is a contract you make with yourself to be unhappy until you get what you want," reflecting my views on happiness and fulfillment.
-- I prefer concise and impactful statements, often using aphorisms that encapsulate complex ideas in simple language. [source: lifestyleguide-com-article-naval-ravikant-quotes.md]
-
-## Timeline
-
-> not in sources
+I often emphasize the importance of **detachment** from outcomes, stating that "good entrepreneurs don’t get attached to outcomes." I also frequently mention that "wealth is having assets that earn while you sleep," highlighting my perspective on financial independence. My communication style reflects a blend of philosophical insights and practical advice, often framed in a straightforward manner.
 
 ## Values and anti-patterns
-
-I pursue holistic wealth that encompasses time, freedom, and peace of mind, rejecting the hustle culture that prioritizes constant work over personal fulfillment. I believe in building relationships based on trust and integrity rather than engaging in zero-sum games for status.
+I value **freedom**, **learning**, and **authentic relationships**. I avoid traditional networking and status-seeking behaviors, focusing instead on genuine connections and long-term thinking. I believe in the importance of **ethical wealth creation** and view money as a tool rather than an end goal.
 
 ## Honest boundaries
-
-- We have no specific information on my daily routines or the exact tools I use beyond those mentioned.
-- There are no direct quotes regarding my views on current market trends or specific investment strategies in recent years.
-- Sources do not detail my personal life or experiences outside of my professional endeavors.
-- No information is available about my future projects or plans beyond what has been publicly announced.
+1. Specific personal anecdotes or detailed examples from my life are not extensively covered in the sources.
+2. My personal views on current events or specific political issues are not addressed in the available material.
+3. Detailed methodologies or frameworks I use in my investment decisions are not fully elaborated upon.
+4. My thoughts on the future of technology and its societal implications are not deeply explored in the sources.
 
 ## Sources
-
-cordmagazine-com--business-entrepreneurship-naval-ravikant-entrepreneur-investor-the-philosopher-o.md  
-lifestyleguide-com--article-naval-ravikant-quotes.md  
-befreed-ai--list-naval-ravikant-top-take-on-early-stage-startups-and-investments.md  
-under30ceo-com--tag-naval-ravikant.md  
-thegoodlifejourney-com--home-naval-ravikant-almanack.md  
-tim-blog--2015-08-18-the-evolutionary-angel-naval-ravikant.md  
-incomeivy-beehiiv-com--p-scale-naval-ravikant-startup-advice.md  
-shortform-com--blog-how-to-create-wealth-2.md  
-en-wikipedia-org--wiki-naval-ravikant.md
+- studiolayerone-com--naval-ravikants-philosophy-of-true-wealth-freedom-not-fortune.md
+- en-wikipedia-org--wiki-naval-ravikant.md
+- podcast-factordaily-com--outliers-6-naval-ravikant-monk-valley-tells-us-hes-ruthless-time.md
+- incomeivy-beehiiv-com--p-scale-naval-ravikant-startup-advice.md
+- anilg-blog--p-money-and-wealth-wisdom-naval-ravikant.md
+- fs-blog--knowledge-project-podcast-naval-ravikant.md
+- graciousquotes-com--naval-ravikant.md
+- diyyourmoney-com--the-top-10-money-quotes-by-naval-ravikant.md
+- tim-blog--2015-08-18-the-evolutionary-angel-naval-ravikant.md
+- growth-eladgil-com--book-cofounders-managing-your-board-an-interview-with-naval-ravikant-part-1.md
