@@ -1,6 +1,6 @@
 # civilian-fm: Plan & Context
 
-> "Palantir for civilians" — a dashboard that compares bare LLM, stuffed-context LLM, and agentic-container LLM outputs, used as a lab to find per-domain context-window sweet spots.
+> "Palantir for civilians" — a system where everyday people navigate bureaucratic friction by chatting with person-agents (real or composite) distilled from public sources, user contributions, and (eventually) AI-conducted interviews. A 4-variant dashboard (bare / persona / stuffed / agentic) measures how much each layer of the harness contributes.
 
 This document is both a reference for humans and context for Claude Code prompts. Keep it terse; update it when decisions change.
 
@@ -29,169 +29,295 @@ If a single user saves $15K/year in taxes for 10 years and indexes the savings i
 
 ---
 
-## 2. Architecture
-
-Three layers + dashboard, each independently runnable.
+## 2. Architecture (v2)
 
 ```
-┌──────────────┐    ┌──────────────┐    ┌──────────────────┐    ┌──────────────┐
-│   Crawler    │ -> │  LLM Wiki    │ -> │ Agentic Container│ -> │  Dashboard   │
-│ (web/yt/etc) │    │ raw + topics │    │  personality +   │    │ 3-col compare│
-│              │    │   markdown   │    │  skills + glob   │    │  + run log   │
-└──────────────┘    └──────────────┘    └──────────────────┘    └──────────────┘
+                              ┌─────────────────┐
+                              │  Crawler        │  (unchanged from v1)
+                              │  (web, youtube) │
+                              └────────┬────────┘
+                                       ▼
+                              ┌─────────────────┐
+                              │  wiki/raw/      │  immutable source of truth
+                              └────────┬────────┘
+                                       ▼
+        ┌────────────────────────────────────────────────────────┐
+        │                  Researcher Pipeline                   │
+        │  (lean processor framework, ~30 LOC, ADK-inspired)     │
+        │                                                        │
+        │   GOAL ──► clarify ──► identify ─┐                     │
+        │                                  ├─► research ─► distill│
+        │   URL  ──► crawl ──► extract ────┘                     │
+        │                                                        │
+        └────────────────────┬───────────────────────────────────┘
+                             ▼
+                  ┌──────────────────────┐
+                  │  entities/           │
+                  │    people/<...>/     │  persona + skills + wiki + agent.py
+                  │    topics/<...>/     │  overview + wiki  (no persona)
+                  └──────────────────────┘
+                             │
+                             ▼
+                  ┌──────────────────────┐
+                  │  PersonAgent         │  Python container — runnable
+                  │  (Python container)  │  loads persona, skills, wiki,
+                  └──────────────────────┘  resolves [[topic:...]] refs
+                             │
+                             ▼
+                  ┌──────────────────────┐
+                  │  Dashboard           │  bare / persona / stuffed / agentic
+                  │  4-variant compare   │
+                  └──────────────────────┘
 ```
 
-### 2.1 Crawler — deterministic ingestion
+### 2.1 Crawler — deterministic ingestion (unchanged from v1)
 
-- `youtube-transcript-api` for free transcript pulls
-- `yt-dlp` for metadata + Whisper fallback when no captions
-- YouTube Data API v3 for query → video URL lists
-- `firecrawl-py` (or Tavily) for search query → markdown
-- `requests` + `beautifulsoup4` for static manufacturer pages
-- `playwright` only when JS rendering is unavoidable
-- LinkedIn: **deferred to v2** (blocks raw scraping aggressively)
+`youtube-transcript-api`, `yt-dlp`, `requests` + `beautifulsoup4`. Writes to `wiki/raw/<source>/<slug>.md`. The crawler stays dumb. What changed in v2 is the **research orchestrator** that decides what to crawl.
 
-### 2.2 LLM Wiki — Karpathy-style flat markdown
+### 2.2 Wiki — flat markdown, Karpathy pattern
 
-Three layers, mapping directly onto Karpathy's LLM Wiki pattern (see Appendix B):
+- `wiki/raw/` — verbatim crawler output. Source of truth, immutable.
+- `wiki/SCHEMA.md` — page-format conventions for raw pages.
 
-- **`wiki/raw/`** — verbatim crawler output, read-only, never hand-edited. Karpathy's "raw sources." Lets us re-distill without re-crawling.
-- **`wiki/topics/`** — distilled facts, citations back to raw, organized by topic. Karpathy's "wiki" layer — the agent-owned knowledge base.
-- **`wiki/SCHEMA.md`** — conventions for the wiki: page format, frontmatter, cross-reference syntax, ingest workflow, contradiction handling. Karpathy's "schema" layer. Tells any agent (or future `scripts/distill.py`) how to maintain the wiki consistently.
+In v2, **`wiki/topics/` is removed.** The distilled "agent-owned" layer now lives inside each entity directory — every person-agent and topic-page owns its own scoped corpus.
 
-No vector DB in v1. With <1000 docs, grep + full-text search wins. Add embeddings only when retrieval actually fails.
+### 2.3 Entities — people and topics
 
-### 2.3 Agentic Container — folders, not Docker
+The knowledge-graph nodes. Two kinds:
+
+- **People** have `persona.md` + `skills.md` + `wiki/` + runnable `agent.py`. Conversational.
+- **Topics** have `overview.md` + `wiki/`. Not conversational — they exist to be referenced from people's personas.
 
 ```
-agents/<agent_name>/
-  personality.md     # tone, audience, refusal posture
-  skills.md          # what I do, when to pull which wiki topic
-  wiki_glob.txt      # which wiki/topics/** files to mount as context
-  agent.py           # ~30 LOC entry point
+entities/
+  _base.py                                    # PersonAgent class
+  _refs.py                                    # resolve [[topic:...]] / [[person:...]] cross-references
+  people/
+    ai-ml/                                    # public figures organized by domain of expertise
+      karpathy/
+        persona.md                            # nuwa-style: mental models, heuristics, expression DNA, honest boundaries
+        skills.md                             # what queries this person serves
+        wiki/
+          public/                             # crawled
+          user-notes/                         # community-contributed
+          interviews/                         # (future) AI-conducted phone-call transcripts
+        agent.py                              # subclasses PersonAgent
+    constitutional-law/
+      roberts/
+    local-government/                         # local people organized by jurisdiction
+      us/wa/mountlake-terrace/permit-office/lisa-smith/
+      us/ga/cherokee-county/alcohol-beverage-control/mary-johnson/
+  topics/
+    ai-ml/
+      transformers/
+        overview.md
+        wiki/
+    constitutional-law/
+      14th-amendment-citizenship/
 ```
 
-Personalities live in a private GitHub repo. Git diffs are the A/B-test trail.
+**Hierarchy choice rationale:** public figures organize by primary domain because "what they're known for" is how you find them. Local-government people organize by jurisdiction because that's how civilians need to find them ("the permit office in MY city").
 
-**Refusal-posture matters.** Without explicit instruction, every model defaults to "consult a professional." A line like *"never deflect to 'consult a CPA' as your primary answer — give the answer first, then suggest verification"* is exactly the away-from-mean steering lever.
+**Knowledge graph via cross-references.** Persona files include `[[topic:ai-ml/transformers]]` and `[[person:ai-ml/ilya]]` syntax. When a `PersonAgent` loads, the runtime resolves these references and pulls the linked topic wikis into context. No graph database — `grep` finds connections. When two people both reference the same topic, that's an emergent edge.
 
-### 2.4 Dashboard — Streamlit, local
+### 2.4 PersonAgent — Python container
 
-Three columns side-by-side per query:
+`entities/_base.py` exposes ~50 LOC:
 
-| Bare model           | Stuffed context        | Agentic container      |
-|----------------------|------------------------|------------------------|
-| `llm(query)` only    | `llm(query, system=full_wiki_dump)` | `agent.run(query)` curated |
-| Latency / token count| Latency / token count  | Latency / token count  |
-| [Good] [Bad] notes   | [Good] [Bad] notes     | [Good] [Bad] notes     |
+```python
+class PersonAgent:
+    def __init__(self, person_dir: Path):
+        self.persona = read(person_dir / "persona.md")
+        self.skills = read(person_dir / "skills.md")
+        self.wiki = load_wiki(person_dir / "wiki")
+        self.linked = resolve_refs(self.persona)        # pull [[topic:...]] / [[person:...]]
+        self.history = []
 
-Every run logs to `runs.db` (SQLite): prompt, outputs, scores, tokens, latency, model. Over time this is the empirical answer to "where is the sweet spot in domain X."
+    def chat(self, msg: str) -> str: ...
+```
+
+Each person's `agent.py` is ~5 lines: import base, point at directory, expose CLI/HTTP entrypoint. "Spinning up Lisa as a Python process" = instantiating this class.
+
+### 2.5 Researcher — processor pipeline
+
+`researcher/pipeline.py` is the lean ADK pattern (Appendix C):
+
+```python
+@dataclass
+class Request:
+    user_goal: str
+    state: dict = field(default_factory=dict)
+
+Processor = Callable[[Request], Request]
+
+def run(processors: list[Processor], req: Request) -> Request:
+    for p in processors:
+        req = p(req)
+    return req
+```
+
+Two pipelines share primitives. **Same `research` and `distill` processors** work for both entry points and both entity kinds (people, topics).
+
+**Goal pipeline** ("I want a permit"):
+```
+clarify → identify_target → research → distill → answer → spawn_chat
+```
+
+**URL pipeline** ("create people from this video"):
+```
+crawl_url → extract_entities → (for each: research → distill) → summary
+```
+
+Convergence: both pipelines produce populated `entities/` directories that the user can chat with.
+
+### 2.6 Dashboard — 4-variant comparison
+
+| Variant | Persona | Knowledge |
+|---|---|---|
+| **bare** | — | — |
+| **persona** | full `persona.md` | — |
+| **stuffed** | "you are a helpful assistant" | all of the entity's `wiki/` dumped in |
+| **agentic** | full `persona.md` | scoped via persona cross-references |
+
+Each comparison targets a specific person-agent. Future calibration: interview the actual person, score which variant matches their real answer best.
+
+Logged to `runs.db` (SQLite). Eval rubric (Appendix D) plumbed in later.
 
 ---
 
-## 3. v1 Stack — confirmed decisions
+## 3. v1 history (shipped 2026-05-10, replaced by v2)
 
-| Layer        | Choice                          | Rationale                                                  |
-|--------------|---------------------------------|------------------------------------------------------------|
-| LLM access   | **LiteLLM**                     | Multi-provider — each column targets Claude / GPT / Gemini independently. Turns the comparison into a 3×3 (harness × model) matrix. |
-| Dashboard    | **Streamlit, local only**       | Fastest Python-to-UI path. No Streamlit Cloud, no FastAPI/React in v1. |
-| First slice  | **Section 179 vehicle deduction** | Concrete crawl targets, dollar-measurable outcomes, tight scope. |
-| Storage      | Flat markdown + SQLite          | No vector DB, no Postgres until pain.                      |
-| Agent perso. | Private GitHub repo (text files)| Git versioning is the A/B trail.                           |
-| Framework    | Anthropic SDK via LiteLLM       | Not Claude Agent SDK, not Google ADK, in v1.               |
+Commit `cdc2bca` shipped a domain-shaped tax-advisor on Section 179 / S-corp content. 9 distilled topic files, 13 crawled IRS pages, 3-runner comparison validated the visible-delta thesis (see `RUN_REPORT.md`).
+
+**Why we moved on:** domain-shaped agents don't capture what differentiates one expert from another and don't address the "who do I talk to" framing. v2 reorganizes around person-shaped agents.
+
+**Kept from v1:** `crawler/` (unchanged), `wiki/raw/` (still source of truth), `dashboard/` (rewired for 4 variants).
+
+**Deleted in v2 build step 1:** `agents/tax-advisor/`, `wiki/topics/taxes/`, and the v1 distillation script that targeted the old topic layout.
 
 ---
 
-## 4. Repository layout
+## 4. Repository layout (v2)
 
 ```
 civilian-fm/
-  pyproject.toml            # litellm, anthropic, streamlit, youtube-transcript-api,
-                            # firecrawl-py, yt-dlp, beautifulsoup4, pyyaml
-  .env                      # ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY,
-                            # FIRECRAWL_API_KEY, YOUTUBE_API_KEY
-  CLAUDE.md                 # behavioral guidelines (already exists)
-  PLAN.md                   # this file
-  crawler/
-    youtube.py              # url_or_query -> {transcript, title, channel}
-    web.py                  # firecrawl wrapper -> markdown
-    manufacturers.py        # tesla, ford, gmc, rivian S179 pages
-    store.py                # writes wiki/raw/<source>/<slug>.md
+  pyproject.toml
+  .env  /  .env.example
+  CLAUDE.md  /  PLAN.md  /  README.md
+  RUN_REPORT.md                                   # v1 evidence, kept as history
+
+  crawler/                                        # unchanged from v1
+    youtube.py
+    web.py
+    store.py
+
   wiki/
-    SCHEMA.md               # layer-3 conventions: page format, ingest, cross-refs
-    raw/
-      youtube/<video_id>.md
-      web/<domain>/<slug>.md
+    SCHEMA.md                                     # raw-page conventions
+    raw/                                          # crawler output, immutable
+      youtube/<vid>.md
+      web/<slug>.md
+
+  entities/                                       # NEW — knowledge graph nodes
+    _base.py                                      # PersonAgent class
+    _refs.py                                      # resolve cross-references
+    people/
+      <domain>/<person>/                          # public figures by expertise
+        persona.md  skills.md  wiki/  agent.py
+      local-government/<country>/<state>/<jurisdiction>/<office>/<person>/
+        persona.md  skills.md  wiki/  agent.py
     topics/
-      taxes/section-179/
-        tesla-cybertruck.md
-        ford-f150.md
-        ...
-  agents/
-    tax-advisor/
-      personality.md
-      skills.md
-      wiki_glob.txt         # "wiki/topics/taxes/**/*.md"
-      agent.py
-  dashboard/
-    app.py                  # streamlit, 3 columns, model dropdowns
-    runners.py              # bare / stuffed / agentic
-    store.py                # sqlite run log
+      <domain>/<topic>/
+        overview.md  wiki/
+
+  researcher/                                     # NEW — pipeline that builds entities
+    pipeline.py                                   # ~30 LOC framework
+    processors/
+      clarify.py                                  # ask 1-3 questions if goal is ambiguous
+      identify.py                                 # goal -> entity reference (search + LLM)
+      crawl_url.py                                # URL-mode entry
+      extract_entities.py                         # raw content -> {people: [...], topics: [...]}
+      research.py                                 # nuwa-style sub-crawls per dimension (with thin-source adaptation)
+      distill.py                                  # build persona.md / overview.md + wiki
+      answer.py                                   # initial response
+      spawn_chat.py                               # hand off to PersonAgent
+    pipelines.py                                  # GOAL_PIPELINE, URL_PIPELINE
+
+  dashboard/                                      # 4-variant comparison
+    runners.py                                    # bare / persona / stuffed / agentic
+    store.py
+    app.py
+
   scripts/
-    distill.py              # raw -> topics, claude-driven (skip in v1; do manually first)
+    research.py                                   # CLI for GOAL or URL pipeline
+    run_comparison.py                             # 4-runner CLI
+
+  runs/  /  runs.db                               # comparison reports (gitignored except evidence)
 ```
 
 ---
 
-## 5. v1 Build Order — Section 179 vertical slice
+## 5. v2 Build Order
 
 Each step has a concrete verification. Don't move on without it.
 
-1. **Skeleton** — `pyproject.toml` + `.env` + repo layout
-   - *Verify:* `python -c "import litellm; print(litellm.completion(model='claude-opus-4-5', messages=[{'role':'user','content':'hi'}]))"` returns a response.
+1. **Delete v1 tax-advisor artifacts.** No backwards compatibility.
+   - *Verify:* `agents/tax-advisor/` and `wiki/topics/taxes/` gone. `dashboard/runners.py` doesn't import tax-advisor.
 
-2. **One crawler target** — `crawler/manufacturers.py` for Tesla S179 page
-   - *Verify:* `wiki/raw/web/tesla-cybertruck.md` exists and contains the $31,300 quote.
+2. **`entities/_base.py` — PersonAgent class** (~60 LOC).
+   - *Verify:* Can instantiate `PersonAgent(Path("entities/people/test/test/"))` with stub files and call `.chat("hi")`.
 
-3. **One distilled topic file** — hand-write `wiki/topics/taxes/section-179/tesla-cybertruck.md`
-   - *Verify:* file is clean markdown with citations back to `wiki/raw/`.
-   - *Why manual first:* see what "good distillation" looks like before automating it in `scripts/distill.py`.
+3. **`researcher/pipeline.py` — processor framework** (~30 LOC).
+   - *Verify:* `run([lambda r: r], Request("test"))` returns the request unchanged.
 
-4. **Expand corpus** — repeat steps 2–3 for Ford F-150, GMC Hummer, Rivian R1T/R1S, plus 2–3 CPA YouTube transcripts.
+4. **First processors — `clarify`, `identify`, `research`, `distill`.** ~50 LOC each.
+   - *Verify clarify:* ambiguous goal → 1-3 questions; clear goal → no questions.
+   - *Verify identify:* "permits in Mountlake Terrace WA" → returns a target person reference.
+   - *Verify research:* spawns parallel crawls, writes both `wiki/raw/` and `entities/people/<...>/wiki/public/` files. Gracefully degrades for thin-source targets (nuwa adaptation, Appendix A).
+   - *Verify distill:* produces a `persona.md` following the nuwa schema (mental models, heuristics, expression DNA where present, honest boundaries).
 
-5. **Extract conventions to `wiki/SCHEMA.md`** — once we have ~5 hand-distilled topic files, pattern-match across them to write the schema: required frontmatter, section headers, citation format, cross-reference syntax, contradiction-flagging rules.
-   - *Why now and not earlier:* writing a schema before you have examples produces a fictional schema. After 5 examples, the conventions are obvious.
-   - *Verify:* one of the 5 existing files violates the schema; fix it. If none do, the schema is too loose.
+5. **First vertical — Lisa Smith (Mountlake Terrace permit office) end-to-end.**
+   - *Verify:* `python -m scripts.research "i want to create a permit for a deck in Mountlake Terrace WA"` populates `entities/people/local-government/us/wa/mountlake-terrace/permit-office/lisa-smith/` and prints an initial answer.
+   - *Verify:* `python entities/people/local-government/us/wa/mountlake-terrace/permit-office/lisa-smith/agent.py` opens a chat with Lisa.
 
-6. **One agent** — `agents/tax-advisor/` with personality, skills, wiki glob, `agent.py`
-   - *Verify:* `python -m agents.tax_advisor "what's the biggest S179 deduction available?"` cites at least one wiki source and gives a dollar figure.
+6. **Second vertical — Karpathy (control case for source-abundant target).**
+   - *Verify:* Same pipeline, no code changes, produces a denser persona.md with multiple `[[topic:...]]` cross-references that resolve cleanly.
 
-7. **Dashboard** — `dashboard/app.py` 3-column Streamlit + model dropdowns
-   - *Verify:* on the same query, the **bare** column says "consult a CPA," the **agentic** column gives specific dollar figures with citations. The visible delta is the proof of concept.
+7. **URL pipeline + entity extraction.**
+   - *Verify:* `python -m scripts.research --url "https://www.youtube.com/watch?v=GCygktDbU3Q"` (SCOTUS transcript already in `wiki/raw/`) creates person-agents for Roberts, Sotomayor, Trump, Barbara, Sour, plus topic pages for `birthright-citizenship` and `14th-amendment-citizenship-clause`.
+   - *Verify:* Trump's persona links to `[[topic:constitutional-law/birthright-citizenship]]`; loading Trump-agent pulls that wiki in.
 
-8. **Run logging** — `dashboard/store.py` writes every run to `runs.db`
-   - *Verify:* `sqlite3 runs.db "select count(*) from runs"` increments per click.
+8. **Dashboard — 4 variants targeting person-agents.**
+   - *Verify:* Streamlit page lets you pick an entity, runs bare/persona/stuffed/agentic against a query, shows visible delta. Logs to `runs.db`.
+
+9. **Cross-reference resolution at runtime.**
+   - *Verify:* When chatting with Karpathy-agent about transformers, the response cites both Karpathy's wiki and the linked transformers topic wiki.
 
 ---
 
-## 6. Use case backlog (post-v1)
+## 6. Use case backlog (v2)
 
-| Use case                              | Crawl targets                                    | Why it's hard                                |
-|---------------------------------------|--------------------------------------------------|----------------------------------------------|
-| Section 179 (v1)                      | Manufacturer pages, CPA YouTube                  | Easy — pages are static, dollar-measurable   |
-| Cherokee County liquor permit         | County website, county clerk YouTube interviews  | Info often only exists by phone — need creative crawl + agent that knows when to suggest a phone call |
-| General permit applications           | Municipal websites, city council C-SPAN, FOIA    | Huge surface area — risks regression-to-mean in agent itself |
-| Reduce tax burden (broader)           | IRS publications, manufacturer pages, CPA blogs  | Adjacent to S179 but blends into legal/CPA territory |
+The product is **"navigate friction in modern life by chatting with the right person."** Each row below is a vertical slice opportunity. Each one populates entities + builds knowledge-graph edges.
+
+| Use case | Target person(s) | Source material | Vertical priority |
+|---|---|---|---|
+| Mountlake Terrace permit | Lisa Smith, permit specialist | city site, meeting minutes, news mentions | v2 first |
+| Karpathy on AI/ML (control) | Karpathy | blog, lectures, papers, tweets | v2 second |
+| SCOTUS oral argument explorer | Roberts, Sotomayor, Trump, Barbara | the SCOTUS YouTube transcript we already have | v2 URL-mode test |
+| Cherokee County liquor license | Mary Johnson, ABC board chair | county site, meeting minutes, eventually user-call notes | v2.5 |
+| Fulton County property tax appeal | County tax assessor staff | assessor site, recent appeal cases | v3 |
+| Hiring first employee (S-corp) | A real CPA distilled from their public content | CPA blog, podcast appearances, video Q&As | v3 — replaces v1's tax-advisor |
 
 ---
 
 ## 7. Open questions / revisit later
 
-- **Agent personality storage** — for now, in-repo under `agents/`. Move to a dedicated private repo when we have >3 agents and want independent versioning.
-- **Embeddings / vector DB** — defer until grep over `wiki/topics/` actually fails. Trigger: agent context windows blow up, or recall on multi-topic queries gets bad.
-- **Audio transcription** — only needed if we hit YouTube videos without captions. `yt-dlp` + `whisper` is the path; ~$0.006/min via OpenAI.
-- **Auth-walled sources** (LinkedIn, Bloomberg, county portals behind logins) — defer.
-- **Hosted dashboard** — Streamlit Cloud is one toggle away once local loop feels right.
+- **AI-conducted phone interviews.** Twilio + Whisper + an LLM script that calls actual people (Mary Johnson, Lisa Smith) to fill honest-boundary gaps. Recording-consent laws differ per state — needs legal review. v3.
+- **News pipeline.** Feed-tagged article ingestion ("data center opened near you"). v3.
+- **CCTV / Flock integration.** Situational context layer. Flock has an enterprise API. v3-v4.
+- **Vector retrieval.** Defer until any entity's wiki exceeds the model's context window. Trigger: any `wiki/` glob > 100k tokens.
+- **Multi-user contribution to shared agents.** Many users adding notes to "their" Mary Johnson agent. Requires auth + moderation. v3.
+- **Hosted dashboard.** Streamlit Cloud is one toggle once the loop feels right.
+- **Deterministic eval** (Appendix D rubric + LLM judge). Plumb in after v2 first vertical works end-to-end.
 
 ---
 
@@ -199,18 +325,21 @@ Each step has a concrete verification. Don't move on without it.
 
 When prompting Claude Code on this repo:
 
-- **Stay in vertical-slice mode.** Don't build all four crawlers before the first agent runs end-to-end.
-- **Don't introduce abstractions** until there are at least three concrete instances of the thing being abstracted.
-- **No Docker, no vector DB, no custom frontend in v1.** Push back on suggestions to add them.
-- **Steering instructions in `personality.md` are the product.** Treat them as carefully as production code — version them, A/B them, log which version produced which output.
-- **Cite from `wiki/topics/`, not from training data.** If an agent answers without citing the wiki, the harness is broken even if the answer is right.
-- **Honest-boundaries habit.** Each `personality.md` should include a one-line instruction asking the agent to state what it doesn't know (e.g., "if a question falls outside the wiki, say so explicitly rather than guessing"). Borrowed from nuwa-skill — see Appendix A.
+- **People-shaped agents only.** No domain-shaped agents (`agents/tax-advisor/`-style). Every conversational agent represents a real or composite person with a `persona.md`, `skills.md`, and growing `wiki/`.
+- **Stay in vertical-slice mode.** Don't build all entity kinds before the first person-agent runs end-to-end.
+- **Don't introduce abstractions** until there are at least three concrete instances of the thing being abstracted. The processor pipeline pattern (Appendix C) applies only to multi-step agents like the researcher — never to single-call agents.
+- **Cite from the entity's wiki, not from training data.** If an agent answers without citing, the harness is broken.
+- **Honest boundaries are mandatory.** Every `persona.md` has a section listing what we don't know about this person. This is non-negotiable per Appendix A.
+- **Cross-references are the graph.** Use `[[topic:...]]` and `[[person:...]]` in markdown. Don't introduce a graph database.
+- **No Docker, no vector DB, no custom frontend** without explicit user approval. Push back on these suggestions.
 
 ---
 
 ## Appendix A: Reference — nuwa-skill
 
-Captured here so we don't re-research it later. **We are not adopting nuwa-skill as a dependency or its schema as our format.** This appendix exists to record what it is, what's worth borrowing, and why the rest doesn't fit.
+Captured here so we don't re-research it later. **We are not adopting nuwa-skill as a dependency.** But after re-reading the source, we are adopting more of its substance than we originally thought — its 12-section schema and its thin-source adaptation rules go directly into our v2 `persona.md` and `researcher/processors/research.py`.
+
+**Material corrections to the original entry are flagged inline below.**
 
 ### What it is
 
@@ -218,27 +347,42 @@ A Claude Code skill (not a Python library) at https://github.com/alchaincyf/nuwa
 
 ### How it works (4 phases)
 
-1. **Research** — 6 parallel subagents each write one file: `01-writings.md`, `02-conversations.md`, `03-expression-dna.md`, `04-external-views.md`, `05-decisions.md`, `06-timeline.md`. Source-gathering = Claude's `WebSearch` tool. No custom crawler.
+1. **Research** — 6 parallel subagents each write one file: `01-writings.md`, `02-conversations.md`, `03-expression-dna.md`, `04-external-views.md`, `05-decisions.md`, `06-timeline.md`. **Correction:** source-gathering uses pluggable info-skills (gemini-video, web-article-reader, agent-reach, pdf, huashu-research) when installed; WebSearch is the fallback, not the default. Our crawler slots into the same pluggable position.
 2. **Synthesis** — distill into a 3-tier schema: Mental Models (3–7, validated by "appears in ≥2 domains"), Decision Heuristics (5–10), Expression DNA (6 quantified style dimensions).
-3. **Build** — fill an 11-section template into one `SKILL.md` (~2k–4k words). Mandatory sections include "Honest Boundaries" listing the persona's blindspots and the skill's own data gaps.
-4. **Validate** — regex-based checks (counts of mental models / limitations / source-citation ratio). Faithfulness validation is human, not automated.
+3. **Build** — fill a **12-section** template (corrected from 11) into one `SKILL.md` (~2k–4k words). Sections: frontmatter, operating-system header, role-play rules, identity card, mental models, decision heuristics, expression DNA, timeline, values & anti-patterns, knowledge genealogy, **honest boundaries** (mandatory), research sources.
+4. **Validate** — **substantive automated quality gates** via subagents, *not* regex-only as we originally documented. Three tests: **known-case alignment** (does the persona match real positions the person took?), **edge-case reasoning** (defensible answers in unseen scenarios), **voice authenticity** (100-word style passage scored against verified writing samples). Plus quantified PASS/FAIL on mental-model count, limitations density, primary-source ratio. The `scripts/quality_check.py` regex linter is only the surface layer.
 
-### What we're borrowing (explicitly)
+### Thin-source adaptation — the unlock we previously missed
 
-- **"Honest 60-point skill > fabricated 90-point skill"** as a principle. Reflected in our personality.md instruction above and in the wiki-citation rule.
-- **The mandatory limitations idea** — agents should state confidence/gaps rather than fabricate. One line in `personality.md`, not a structural section.
+Nuwa explicitly handles thin-source targets. From their docs (translated):
 
-### What we're NOT borrowing (and why)
+> *"When post-Phase-0.5 evaluation finds available sources <10, mental models are reduced to 2-3, each labeled 'based on limited information / inference'."*
 
-- **Their schema (Mental Models / Heuristics / Expression DNA).** Designed for distilling people. Most v1 use cases (Section 179 advisor, permit helper) are domain-shaped, not person-shaped. Forcing "Expression DNA" on a tax advisor is silly.
-- **Their pipeline.** Five of the six research files (writings, conversations, external views, decisions, timeline) assume the subject is a heavily-documented public figure. They silently fail on a county clerk who has near-zero public footprint. Source-discovery is the hard part for our use cases — and that's the part nuwa-skill doesn't solve.
-- **Their tooling.** It's Claude Code-native; no LiteLLM-friendly entrypoint. We'd be locked into one harness.
+> *"If the user provides local material, analyze it first: which dimensions does it cover? Which are missing or weak? Spawn search agents only for the missing dimensions; skip search for dimensions already covered."*
 
-### When to revisit
+**This is exactly the Lisa-Smith / Mary-Johnson pattern.** Our earlier dismissal of nuwa ("doesn't work for thin sources") was wrong. Their framework adapts; their examples just don't showcase it.
 
-If we add a person-distillation use case to v1 (e.g., "what would my CPA say about this?"), reopen this and consider:
-- Adopting their template structure for `personality.md` for those specific agents only.
-- Replacing their Phase 1 web-search step with our crawler + structured phone-interview intake (the make-or-break gap for the county-clerk variant).
+### What we ARE borrowing (revised after re-read)
+
+- **The 12-section schema** as the structure of our `persona.md`. Mental Models / Decision Heuristics / Expression DNA / Honest Boundaries are all directly applicable now that v2 is people-shaped.
+- **The thin-source adaptation rules** — reduce mental models to 2-3, label inferences, search only for missing dimensions. Goes into `researcher/processors/research.py` and `distill.py`.
+- **The substantive validation tests** (known-case, edge-case, voice authenticity) — port into the eval framework from Appendix D when we plumb it in.
+- **The pluggable source-skill pattern.** Our crawler is the "info-skill"; we plug it into the same slot nuwa uses.
+- **Honest Boundaries as a mandatory schema section** — not optional, not a one-liner. A full section per persona. Reflected in Section 8 behavioral notes.
+- **"Honest 60-point skill > fabricated 90-point skill"** as a guiding principle.
+
+### What we're NOT borrowing
+
+- **The framework wrapper.** Nuwa is Claude Code-native (`npx skills add`). We re-implement the patterns in Python so it integrates with LiteLLM and our processor pipeline.
+- **WebSearch as primary source.** Our crawler is more deliberate and writes structured `wiki/raw/` files.
+
+### Citation: where to verify
+
+- `SKILL.md` — main orchestration file (Chinese with English README).
+- `references/extraction-framework.md` — the schema.
+- `references/skill-template.md` — the 12-section template.
+- `examples/munger-perspective/SKILL.md` — worked example.
+- `scripts/quality_check.py` — surface regex layer (the substantive tests are in the SKILL.md instructions, not in this script).
 
 ---
 
@@ -276,14 +420,14 @@ Division of labor (Karpathy's words): *"Your job is to curate sources, direct th
 | Karpathy | civilian-fm | Notes |
 |---|---|---|
 | Raw sources (read-only) | `wiki/raw/` | Crawler output, never hand-edited |
-| The wiki (agent-owned) | `wiki/topics/` | Distilled topic pages, citations back to raw |
+| The wiki (agent-owned) | `entities/people/<...>/wiki/` and `entities/topics/<...>/wiki/` | In v2 the distilled layer lives inside each entity. Each person and each topic owns its own scoped corpus. |
 | The schema | `wiki/SCHEMA.md` | Conventions for ingest + page format. Written after step 4 of the build order, against real S179 examples |
 
 ### What we're adopting
 
 - **The 3-layer separation** — raw read-only, wiki LLM-owned, schema as conventions doc.
 - **Markdown + git, no vector DB** — through v1.
-- **Agent maintains, human curates** — the agent generates and updates `wiki/topics/`; we direct what to crawl and what questions matter.
+- **Agent maintains, human curates** — the researcher pipeline generates and updates each entity's `wiki/`; we direct what to crawl and what questions matter.
 
 ### Where we deviate (and why)
 
@@ -292,5 +436,136 @@ Division of labor (Karpathy's words): *"Your job is to curate sources, direct th
 
 ### When to revisit
 
-- If a single agent's wiki slice exceeds the model's context window → introduce embedding-based retrieval over `wiki/topics/` (already noted in Section 7).
+- If a single entity's wiki exceeds the model's context window → introduce embedding-based retrieval over that entity's `wiki/` (also noted in Section 7).
 - If contradictions across sources start mattering (e.g., manufacturer says $31,300, IRS publication implies a different cap) → formalize the `_contradictions.md` pattern from Karpathy's gist.
+
+---
+
+## Appendix C: Reference — Google ADK internals
+
+Source-level reading of https://github.com/google/adk-python. **We are not adopting ADK.** This appendix records what's worth borrowing and what's not, so we don't keep relitigating it.
+
+### What ADK actually is
+
+- Open-source agent framework, Python/TypeScript/Go/Java. Marketed as "model-agnostic" via a `LiteLlm` wrapper (`models/lite_llm.py`) — real-ish, with caveats: Gemini `types.Content` is canonical internally, so Gemini-specific parts (file URIs, thought signatures) degrade on Anthropic/Vertex.
+- Deployment targets Cloud Run / GKE / Vertex Agent Engine. "Lightweight" deployment in practice is a single LLM call with a constructed system prompt — same shape as our tax-advisor.
+
+### Execution loop
+
+`LlmAgent._run_async_impl` → `BaseLlmFlow.run_async`. Standard tool-use loop: preprocess → LLM call → postprocess → handle function calls → repeat until final response. Same shape as every other framework. Nothing special.
+
+### Multi-agent mechanisms (the marketing pitch)
+
+Two distinct patterns:
+- **Sub-agent-as-tool** (`tools/agent_tool.py`) — wrap a child agent as a `FunctionDeclaration`, copy state down, merge state delta up.
+- **Transfer-to-agent** (`tools/transfer_to_agent_tool.py`) — a tool that sets `tool_context.actions.transfer_to_agent = name`; the flow re-dispatches.
+
+Plus shell agents: `SequentialAgent`, `ParallelAgent` (asyncio.TaskGroup with backpressure), `LoopAgent` (terminates on `event.actions.escalate`). All conceptually simple; the docs make them sound bigger than they are.
+
+### State and memory
+
+Three-tier:
+- `Session` — `app_name`, `user_id`, `id`, `events[]`, `state{}`, persisted via pluggable `SessionService` (in-memory, SQLite, Vertex).
+- `State` — dict with `_value` + `_delta`; reads check delta first. Prefixes `app:`, `user:`, `temp:` are conventions for the persistence layer to route scope.
+- `MemoryService` — separate, for cross-session retrieval (in-memory, Vertex RAG, Memory Bank).
+- `instructions` processor does `{var}` substitution from session state into the system prompt — that's the built-in scratchpad.
+
+### Two ideas worth borrowing
+
+1. **Processor pipeline.** `SingleFlow` registers ~12 request processors in a fixed order (`basic → auth → instructions → identity → compaction → contents → context_cache → planning → code_execution → output_schema`). Each is a tiny composable unit mutating an `LlmRequest`. Far cleaner than a monolithic `build_system_prompt()` function when you have multiple prompt-construction steps.
+   
+   **Adoption rule for civilian-fm:** apply only to multi-step agents like the researcher pipeline (clarify → plan → search → crawl → distill → answer). Do not refactor the tax-advisor — one LLM call, one function, no processors. We don't build framework where there isn't pipeline.
+
+2. **`output_key` convention.** An `LlmAgent` can declare `output_key="search_results"`; its final response auto-writes to session state under that key. Next agent reads it. Clean handoff between sequential subagents without a framework.
+   
+   **Adoption rule:** when the researcher has 5+ sequential steps, use this as a convention. Don't enforce via Pydantic; just a `state: dict` that each step mutates by name.
+
+### What we're NOT borrowing
+
+- **The framework itself.** Pydantic config schemas, live/streaming code paths, audio transcription manager, Vertex coupling, event-bus abstractions — all bloat for our purposes.
+- **Multi-agent transfer mechanics.** Sub-agent-as-tool and transfer-to-agent are clever, but premature. Until we have 3+ agents in one loop, a `for p in processors:` is enough.
+- **`LiteLlm` wrapper.** We already use LiteLLM directly; ADK's wrapper adds an additional translation layer we don't need.
+
+### Concrete lean implementation
+
+The whole processor-pipeline pattern, civilian-fm-style:
+
+```python
+# agents/researcher/pipeline.py — ~30 LOC total
+from dataclasses import dataclass, field
+from typing import Callable
+
+@dataclass
+class Request:
+    user_goal: str
+    state: dict = field(default_factory=dict)
+
+Processor = Callable[[Request], Request]
+
+def run(processors: list[Processor], goal: str) -> Request:
+    req = Request(user_goal=goal)
+    for p in processors:
+        req = p(req)
+    return req
+```
+
+Each processor is a plain function. `output_key` is convention, not type-enforced. If we ever need async or streaming, we add it then.
+
+### When to revisit
+
+- If we end up wanting native Gemini features (thought signatures, multimodal Gemini-specific shapes) → consider ADK's `LiteLlm` wrapper.
+- If we need multi-agent routing across 5+ specialized agents → reconsider their transfer-to-agent pattern (but probably reimplement leaner).
+
+---
+
+## Appendix D: Evaluation framework — variants and scoring
+
+The dashboard's comparison value depends on us being honest about what we're measuring. This appendix locks in the variants and the scoring stack so we don't drift into vibes-only comparison.
+
+### The four variants
+
+We compare on two independent axes — **persona** (on/off) and **knowledge** (off / scoped / full-dump):
+
+| Variant | Persona | Knowledge | Isolates |
+|---|---|---|---|
+| **bare** | — | — | Mean-of-the-internet baseline |
+| **persona** | full `personality.md` + `skills.md` | — | Persona-only effect: does refusal-posture + tone steering work without any corpus? |
+| **stuffed** | "you are a helpful assistant" | full wiki dump | Knowledge-only effect: does adding context help without instruction on how to use it? |
+| **agentic** | full | scoped via `wiki_glob.txt` | Full harness. Should win — and the delta vs. `persona` and `stuffed` separately attributes the lift |
+
+This decomposition lets us write claims like "the persona contributes ~1.1 rubric points; the scoped wiki contributes ~0.6; the combination contributes ~1.7" instead of "agentic is better."
+
+### Three-layer scoring stack
+
+Industry pattern (Anthropic, Confident AI, Evidently, G-Eval paper). Combine:
+
+1. **Programmatic checks** (`eval/checks.py`) — regex/structural rules. Zero LLM cost, instant, fully deterministic. Examples for tax-advisor:
+   - Contains `$\d` (dollar figure)? Boolean.
+   - Contains `consult a (tax professional|CPA|accountant)` (refusal pattern)? Boolean.
+   - Contains `[wiki:` (citation marker)? Count.
+   - Has `## Limits` or `## Honest boundaries` section? Boolean.
+   - Word count.
+
+2. **LLM-as-judge with rubric** (`eval/rubric.py`) — for subjective dimensions. Single judge model (GPT-4o), temperature=0, fixed prompt, structured output. Rubric dimensions (1-5 each):
+   - **Actionability** — concrete next steps vs. vague advice
+   - **Specificity** — uses the user's actual details (S-corp, Cobb County, spouse on payroll)
+   - **Trust** — could a sharp reader verify each claim?
+   - **Steering** — ranked by impact, or flat list?
+
+3. **Human spot-checks** — every Nth run gets human review, stored alongside the judge score. Used to compute judge-vs-human agreement over time. If agreement drops below ~0.7, recalibrate the rubric.
+
+### Storage
+
+Extend the existing `runs` table in `runs.db` with: `prog_score` (JSON of programmatic checks), `judge_score` (JSON of rubric dimensions), `judge_model`, `human_score` (nullable, JSON), `human_notes`.
+
+### Why this matters
+
+Without scoring, every dashboard run is a vibes-check. With scoring, after ~50 runs you can plot real claims: "in the tax domain, agentic beats stuffed by 1.7 ± 0.4 rubric points (n=23)." That's the empirical answer to the "where's the context-window sweet spot" question the original plan posed.
+
+### Build order
+
+1. Add the `persona` variant (~15 LOC in `dashboard/runners.py`).
+2. Add `eval/checks.py` (~80 LOC, all regex).
+3. Add `eval/rubric.py` (~50 LOC, one LLM call with structured output).
+4. Plumb scores into `runs.db` + the Streamlit UI.
+5. Run 30+ queries to seed the dataset before next architecture push.
