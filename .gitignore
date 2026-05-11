@@ -6,7 +6,8 @@ __pycache__/
 runs.db
 runs/*
 !runs/.gitkeep
-!runs/20260510T191849Z.md   # the v1 first-run evidence — keep tracked
+!runs/20260510T191849Z.md   # v1 first-run evidence
+!runs/v2-mountlake-terrace-permit-office-20260511T170616Z.md   # v2 first-vertical evidence
 .streamlit/
 .DS_Store
 *.egg-info/
