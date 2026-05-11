@@ -1,10 +1,12 @@
 ---
 source: youtube
-fetched_at: '2026-05-10T19:10:00Z'
+fetched_at: '2026-05-11T20:08:36Z'
 url: https://www.youtube.com/watch?v=GCygktDbU3Q
 video_id: GCygktDbU3Q
 language: en
-title: null
+title: 'Oral Argument on birthright citizenship: Trump v. Barbara'
+uploader: Supreme Court Oral Argument Transcripts
+duration_seconds: 7711
 ---
 
 [00:00] We will hear argument this morning in

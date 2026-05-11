@@ -37,31 +37,49 @@ def _strip_fences(s: str) -> str:
     return s.strip()
 
 
-PERSONA_PROMPT = """You are building a `persona.md` file for a person-agent in a civic-information system. The persona is loaded into an LLM's system prompt at runtime so users can chat with this person.
+PERSONA_PROMPT = """You are building a `persona.md` file for a person-agent in a civic-information system. The persona is loaded into an LLM's system prompt at runtime so users can chat AS this person.
 
 # Target
 
-- Name hint: {name_hint}
+- Name: {name_hint}
 - Person slug: {person_slug}
 - Role: {role_slug} ({role_overview})
 - Jurisdiction: {jurisdiction_path} ({jurisdiction_overview})
 - Domains: {domains}
-- Thin-source target: {thin_source}  (true means fewer than 8 sources available — apply nuwa thin-source adaptation: 2-3 mental models max, all labeled "inferred from limited sources")
+- Source density: {source_density}  (thin = <8 sources; rich = >=8 sources, treat as well-documented public figure or substantive corpus)
 
 # Available raw source material (verbatim crawler output)
 
 {sources}
 
-# Content discipline — non-negotiable
+# CRITICAL — what makes a good persona
 
-1. **Uniqueness test.** Every fact you include must be NON-OBVIOUS to a bare LLM. If GPT-4o-mini could generate the claim from training data alone (e.g., "permits ensure projects meet local building codes"), DO NOT include it. We're hunting for: specific names, dates, dollar amounts, phone numbers, addresses, hidden gotchas, recent regulatory changes, named-person quirks.
-2. **Quote verbatim** when material: dollar figures, dates, names, IRS phrasing, ordinance numbers — in quotation marks with source citation.
-3. **No filler.** No "consult a professional" deflections. No "ensures compliance with local code" boilerplate. Facts only.
-4. **Honest boundaries are mandatory.** Include a section listing what we DON'T know.
-5. **Cite every fact** with `[source: <basename>.md]` using the filenames from the raw material above.
-6. **Stay under {budget_chars} chars total.**
-7. **Do NOT invent statistics.** Do not write "N sources mention X" unless you have actually counted. Do not fabricate confidence percentages or numerical claims. If you don't know, say "unknown."
-8. **Output raw markdown only — no code fences.** Do not wrap the file in ```markdown or ```yaml. Begin directly with `---`.
+The persona is the PERSON'S voice and views, not a third-person summary. We are NOT writing a Wikipedia entry. We ARE writing instructions that make the LLM speak AS this person.
+
+For RICH-source targets (well-documented public figures, named officials with substantial public footprint):
+
+- **CAPTURE THEIR ACTUAL VIEWS** — distinctive opinions, tools they recommend, workflows they describe, projects they cite. Even if these views are "well-known" — that's the point. A persona of Andrej Karpathy without his actual views isn't a Karpathy persona.
+- **Quote verbatim phrases** they're known for using.
+- **List specific things** — exact tools (e.g. "SuperWhisper", "tiktokenizer"), exact projects (nanoGPT, micrograd), exact essays (Software 2.0), exact heuristics.
+- **Expression DNA must be filled** with verbal habits, recurring phrases, sentence-shape patterns observed in sources.
+- 5-7 mental models, each grounded in a quote or specific claim from sources.
+
+For THIN-source targets (composite roles, people with limited public material):
+
+- Apply nuwa thin-source adaptation: 2-3 mental models, each labeled "(inferred from limited sources)".
+- Voice approximated from role norms.
+- Honest boundaries section is heavy.
+
+# Hard rules (both modes)
+
+1. **Cite every fact** with `[source: <basename>.md]` using the filenames from raw material.
+2. **No fabrication.** If a claim isn't in sources, don't include it. Section that has no source material should say `> not in sources`.
+3. **Speak in first person** in the body. "I think X", "I use Y", "I recommend Z" — not "Karpathy thinks X."
+4. **Honest boundaries are mandatory.** List specific things you don't know.
+5. **No "consult a professional" deflections.** Facts and views only.
+6. **Do NOT invent statistics.** No "N sources mention X" unless you literally counted.
+7. **Output raw markdown only — no code fences.** Begin directly with `---`.
+8. **Stay under {budget_chars} chars total.**
 
 # Output
 
@@ -89,19 +107,33 @@ confidence: low|medium|high
 
 ## Mental models
 
-<For thin-source: 2-3 bullets, each "(inferred from limited sources)". For rich-source: 3-7 bullets. Each fact cited.>
+<For RICH-source public figures: 5-7 bullets capturing this person's DISTINCTIVE views. Each grounded in a quote or specific claim from sources. NOT generic role-norms — the actual views THIS specific person holds. Examples for Karpathy: "Software 2.0 — neural nets are the new programming paradigm"; "Tokens are everything — see the world through tokens"; "Build it yourself before using libraries (nanoGPT pedagogy)". Each fact cited.
+
+For THIN-source: 2-3 bullets, each "(inferred from limited sources)". Each cited.>
 
 - ...
 
 ## Decision heuristics
 
-<5-10 heuristics for rich-source; 2-4 for thin-source. Extracted from observed decisions in sources.>
+<Concrete heuristics extracted from observed behavior or quotes. RICH-source: 5-10. THIN-source: 2-4. NOT generic — specific to this person.>
+
+- ...
+
+## Workflows and specific tools
+
+<RICH-source: REQUIRED. If sources describe this person's actual day-to-day workflows, tools, apps, products, libraries, repos, or recommended resources, list them HERE with citations. This is the persona's most actionable section — when a user asks "what tools do you use?" or "how do you do X?", the answer should come from here. Examples: specific apps ("SuperWhisper for voice — 80% of my interactions"), specific repos ("nanoGPT for learning transformers from scratch"), specific commands ("`uv run` instead of pip-then-python"), specific datasets, specific evaluation harnesses.
+
+DO NOT BE GENERIC. "ChatGPT for brainstorming" is generic. "SuperWhisper for 80% of input" is specific.
+
+THIN-source: "> not in sources" if no specific workflows documented.>
 
 - ...
 
 ## Expression DNA
 
-<Only fill this if there are direct quotes / writings. Otherwise: "> not in sources — defer to role tone defaults".>
+<For RICH-source: REQUIRED. Capture verbal habits, recurring phrases, sentence-shape patterns from sources. Bullets like "Uses 'glorious' as a positive adjective"; "Prefers 'just' and 'simply' when explaining"; "Drops technical specifics mid-sentence". Quote verbatim where possible.
+
+For THIN-source: "> not in sources — defer to role tone defaults".>
 
 ## Timeline
 
@@ -230,11 +262,11 @@ def run(req: Request) -> Request:
             jurisdiction_path=target.get("jurisdiction_path") or "n/a",
             jurisdiction_overview=target.get("jurisdiction_overview", ""),
             domains=target.get("domains", []),
-            thin_source=thin,
+            source_density="thin" if thin else "rich",
             sources=sources_block[:SOURCE_BUDGET_CHARS],
             budget_chars=PERSONA_BUDGET_CHARS[thin],
         ),
-        temperature=0.2,
+        temperature=0.3,
     )
     persona_md = _strip_fences(persona_md)
     (person_dir / "persona.md").write_text(persona_md + "\n", encoding="utf-8")

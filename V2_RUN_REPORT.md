@@ -127,6 +127,87 @@ Full comparison: [runs/v2-jeff-niten-mountlake-terrace-20260511T173510Z.md](runs
 
 Interesting nuance observed in the 4-variant: on a more complex query ("...does the budget gap affect permit speed?"), **stuffed actually matched or slightly beat agentic** on factual coverage — it surfaced the $6.50 State Building Code Council fee that agentic dropped. This is exactly the Section 2.7 canary: the persona's selective resolution may be filtering out useful signal. Future iteration: tighten `skills.md` link-following rules to ensure budget-related queries actually pull the budget-gap facts the persona has.
 
+## Iteration 2 — Karpathy vertical + workflow section
+
+Built a Karpathy person-agent from public sources (Wikipedia, his blog index, his LLM Wiki gist, a transcript of his "How I Use LLMs" talk, Klu.ai glossary, his github profile, AutoResearch repo, etc).
+
+First iteration of the persona was too generic — captured "I believe in simplicity in coding" but not his actual distinctive views. Root cause: the distill prompt's "uniqueness test" cut Karpathy's known views because GPT could generate them from training data. Fix: rewrote the prompt to explicitly preserve well-known views for public figures (the persona is supposed to be their voice; cutting their known views defeats the purpose).
+
+Second iteration added a "Workflows and specific tools" section to the persona schema, forcing the LLM to extract specific repos, apps, courses, and resources from sources rather than generic concept descriptions.
+
+### AHA #1 — "What are *your* resources?"
+
+Query: *"If I'm a developer who wants to learn deep learning by actually building things, what specific repos, tools, or resources of yours should I use? Be concrete."*
+
+Full output: [runs/v2-andrej-karpathy-20260511T200759Z.md](runs/v2-andrej-karpathy-20260511T200759Z.md).
+
+| Variant | Surfaces Karpathy's own work? |
+|---|---|
+| bare | **No.** Lists TensorFlow, PyTorch, fastai, Coursera, 3Blue1Brown, Sentdex. Doesn't realize the question is about Karpathy's resources. Generic mean answer. |
+| persona | **Yes.** nanoGPT, CS231n, Zero to Hero, **AutoResearch**, Obsidian. With links. First-person voice. |
+| stuffed | Mixed. Surfaces Zero to Hero, CS231n, ConvNetJS, AutoResearch from the wiki dump — but generic helper voice. |
+| agentic | **Yes, and in voice.** nanoGPT, CS231n, Zero to Hero, AutoResearch, Obsidian, YouTube channel. First-person, with links. |
+
+The bare model's answer is textbook mean-of-the-internet — it gives the canonical "how to learn deep learning" list with zero personalization. The persona/agentic columns recognize this is a Karpathy question and surface his actual repos (including AutoResearch, which the user specifically asked about).
+
+## Iteration 3 — URL pipeline on SCOTUS transcript
+
+PLAN.md build step 7. Ran `--url https://www.youtube.com/watch?v=GCygktDbU3Q` (Trump v. Barbara oral argument, 128min, 3,419-line transcript already in `wiki/raw/youtube/`).
+
+Pipeline extracted:
+- **8 people**: Trump, Barbara, Sen. Trumbull, Justice Thomas, Justice Scalia, Justice Kagan, Justice Gorsuch, Justice Barrett.
+- **6 topics**: birthright citizenship, 14th Amendment, Civil Rights Act of 1866, Dred Scott, Wong Kim Ark, illegal immigration.
+
+For each person, the pipeline ran sub-research (3-8 sources each) and built a persona. Topic distillation is deferred to a later iteration.
+
+Each justice's persona captured their actual judicial philosophy with quoted opinions:
+- **Thomas**: Originalism, with Bruen quote on Second Amendment.
+- **Kagan**: Voting Rights Act defense, with her "blood of Union soldiers" quote.
+- **Gorsuch**: Textualism + originalism, with Bostock v. Clayton quote.
+- **Barrett**: Originalism, with public-meaning emphasis.
+
+### AHA #2 — "Same constitutional question, different judicial reasoning"
+
+Asked all 4 justice agents the exact question at the heart of the case:
+
+> *"Should the 14th Amendment's birthright citizenship clause apply to children born in the US to parents who are illegally present in the country? What is your reasoning?"*
+
+| Agent | Position | Reasoning style |
+|---|---|---|
+| **bare** | "the prevailing view is that the clause DOES apply" | Lists "key points" and lands on the conventional view. Hedges on policy. One mushy answer. |
+| **Justice Thomas** | **Against** | "Subject to the jurisdiction thereof" requires allegiance. Original understanding does not support automatic citizenship. Cites Wong Kim Ark but distinguishes legal vs illegal residents. |
+| **Justice Kagan** | **For** | "Upholds equality and inclusion." Historical context post-Civil War. Wong Kim Ark stands. Refuses to narrow the clause based on parental status. |
+| **Justice Gorsuch** | **Hedges** | "May ultimately need to be resolved by the Supreme Court... commitment to the rule of law and original meaning." Notes both interpretations. Cautious. |
+| **Justice Barrett** | **For (from originalist position)** | Original public meaning supports it. Cites jus soli, Dred Scott overturning. |
+
+**This is the strongest AHA so far.** Same constitutional question, four meaningfully different answers — each consistent with the justice's actual jurisprudence — vs one mushy "balanced" answer from the bare model. For a lawyer prepping arguments or a citizen trying to understand the case, the persona-agent answers are infinitely more useful than the bare summary. They reveal **why** the justices disagree, not just **that** they do.
+
+## Synthesis — where does the system steer away from the mean?
+
+After three experiments (Lisa Smith/Jeff Niten Mountlake Terrace, Karpathy, 4 SCOTUS justices), the pattern is clear:
+
+**The system steers away from the mean most strongly when:**
+
+1. **The user's question is "what would this specific person say?" rather than "what's the answer to X?"** The bare model defaults to averaging all viewpoints. A person-agent commits to one viewpoint — the one its persona was steered toward.
+
+2. **The persona has rich, specific source material** (multiple direct quotes, named tools, dated events, specific cases). Karpathy's nanoGPT, Kagan's "blood of Union soldiers" quote, Thomas's Bruen reasoning — these are anchors the bare model lacks.
+
+3. **The question would normally elicit a "balanced" or "depends" answer.** Bare models are RLHFed to hedge. Persona agents inherit the conviction of their source person.
+
+4. **The question is specific to that person's expertise.** Karpathy on transformer pedagogy. Justice Thomas on originalism. Local officials on local procedure. The mean wouldn't know the specifics; the persona does.
+
+**Where the system reverts toward the mean:**
+
+1. **When the persona is composite/role-shaped** (Mountlake Terrace Permit Office) rather than a named individual. Composites don't have strong views to inherit.
+
+2. **When source material is generic** (Wikipedia summaries, glossary entries). The persona ends up sounding like a Wikipedia entry.
+
+3. **When the question is too general for the persona to have a view** ("how do I be productive?"). The agent has no Karpathy-specific take, so it gives the generic productivity advice the bare model would.
+
+4. **When context-rot kicks in.** The agentic system prompt is ~45k tokens. Specific facts buried in the middle (like SuperWhisper in Karpathy's wiki) sometimes get washed out. Section 2.7 Rule 2 (density over volume) matters more than the architecture itself.
+
+**The product implication:** the system's value is highest for questions of the form **"how would [specific person] handle this?"** or **"what would [specific person] tell me?"** — questions where the answer depends on a person's specific framework, not on objective truth. Civic, legal, technical-pedagogy, professional-advice, and political-reasoning queries fit this pattern. Pure factual queries ("what time is it in Tokyo?") don't — they're served by the bare model.
+
 ## Known issues / next iteration targets
 
 1. ~~No specific person identified.~~ **Fixed in iteration 1.**
